@@ -396,8 +396,8 @@ footer code{color:var(--gold2)}
           <div class="range-info" id="rangeInfo" style="margin:10px 0 0"></div>
         </div>
         <div class="form-row" style="margin-top:12px">
-          <button class="btn" id="loadStartBtn">📥 载入并开始</button>
-          <span class="muted" id="builtinHint" style="font-size:12px">按序号选一段（如第 1–100 词），选好词汇书与范围后点「载入并开始」。</span>
+          <button class="btn" id="loadStartBtn">📥 载入词库</button>
+          <span class="muted" id="builtinHint" style="font-size:12px">按序号选一段（如第 1–100 词），选好词汇书与范围后点「载入词库」，再回「测试」页点「开始测试」。</span>
         </div>
         <div class="muted" style="font-size:12px;line-height:1.8;margin-top:8px">
           释义含 <b class="gold-text">基础释义 + 拔高释义</b> 两档，答题时同时显示（拔高释义只在部分词条存在，仅作提示、不参与批改）。
@@ -530,8 +530,8 @@ footer code{color:var(--gold2)}
         </div>
       </div>
       <div class="hint-box" style="margin-top:16px">
-        <b>选词方式</b>：词库在 <b>「① 词库」页</b> 选定——内置词库挑好书、填好起止序号后点「载入并开始」；
-        或用自己粘贴导入的自建词库点「使用」。选好后此处会显示<b>当前测试词库</b>，本页只需设置抽词数与答题规则。<br>
+        <b>选词方式</b>：词库在 <b>「① 词库」页</b> 选定——内置词库挑好书、填好起止序号后点「载入词库」；
+        或用自己粘贴导入的自建词库点「使用」。载入后回到本页填写学生姓名、点「开始测试」才开考；本页只显示<b>当前测试词库</b>，可设置抽词数与答题规则。<br>
         <b>抽取规则</b>：每次开始测试都会<b>重新随机打乱单词顺序</b>（勾选「全部」时同样打乱后测试，不会按词库原顺序出题）。<br>
         <b>释义提示</b>：内置词汇书答题时会同时显示 <b>基础释义</b> 与 <b>拔高释义</b>（拔高释义只在部分词条存在），
         两档释义都只作提示，<b>不参与批改</b>。<br>
@@ -561,7 +561,7 @@ footer code{color:var(--gold2)}
 </main>
 
 <footer>
-  📌 <b>使用流程</b>：① 在「① 词库」页选词库——内置词库挑一本、填起止序号后点「载入并开始」，或自建词库点「使用」→ ② 在「② 测试」页填写学生姓名、设置抽词数与答题规则 → ③ 学生全屏答题 → ④ 交卷后自动批改，错词自动进入错词本，可一键导出 CSV，也可一键导入为错词库做二次测试。<br>
+  📌 <b>使用流程</b>：① 在「① 词库」页选词库——内置词库挑一本、填起止序号后点「载入词库」，或自建词库点「使用」→ ② 在「② 测试」页填写学生姓名与答题规则、点「开始测试」→ ③ 学生全屏答题 → ④ 交卷后自动批改，错词自动进入错词本，可一键导出 CSV，也可一键导入为错词库做二次测试。<br>
   💾 所有数据保存在 <code>本机浏览器 localStorage</code>，不会上传；换浏览器或清除浏览器数据会丢失，请定期导出 CSV 备份。
 </footer>
 
@@ -5469,7 +5469,7 @@ $('rangeTo').oninput    = () => { $('segSel').value = ''; updateRangeInfo(false)
 $('rangeFrom').onchange = () => { updateRangeInfo(true); saveSettings(); };
 $('rangeTo').onchange   = () => { updateRangeInfo(true); saveSettings(); };
 
-/* 「载入并开始」：把词库页选定的内置范围载入，切到测试页；学生姓名已填则直接开考 */
+/* 「载入词库」：把词库页选定的内置范围载入并切到测试页；只载入、不自动开考，开考仍需点「开始测试」 */
 $('loadStartBtn').onclick = () => {
   $('libSource').value = 'builtin';
   refreshSourceUI();
@@ -5478,12 +5478,10 @@ $('loadStartBtn').onclick = () => {
   saveSettings();
   switchTab('test');
   const name = $('studentName').value.trim();
-  if (name){
-    $('startBtn').click();                 // 姓名已填 → 直接开始
-  } else {
-    $('testWarn').textContent = `已载入「${info.name} 第${info.from}–${info.to}词」（${info.n} 词），填写学生姓名后点「开始测试」。`;
-    $('studentName').focus();
-  }
+  $('testWarn').textContent = name
+    ? `已载入「${info.name} 第${info.from}–${info.to}词」（${info.n} 词），点「开始测试」即可开考。`
+    : `已载入「${info.name} 第${info.from}–${info.to}词」（${info.n} 词），填写学生姓名后点「开始测试」。`;
+  if (!name) $('studentName').focus();
 };
 
 /* 内置词库面板折叠（记忆状态） */
