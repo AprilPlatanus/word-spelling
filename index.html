@@ -163,6 +163,32 @@ main{max-width:1080px;margin:0 auto;padding:20px 28px 60px}
   background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:2px 8px;
   font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--gold2);
 }
+
+/* ---- 测试页：紧凑布局 + 规则折叠（目标：一屏内看到「开始测试」按钮） ---- */
+#tab-test .card{padding:16px 20px}
+#tab-test .card h2{margin-bottom:10px}
+#tab-test .picked-bar{padding:10px 14px;margin-bottom:4px}
+#tab-test .picked-bar .pk-lbl{font-size:11px}
+#tab-test .picked-bar .pk-name{font-size:15px;margin:2px 0 1px}
+#tab-test label{margin:9px 0 5px}
+#tab-test input[type=text],#tab-test select{padding:9px 12px}
+.rule-box{margin-top:10px}
+.rule-box > summary{
+  list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  font-size:13px;font-weight:700;color:var(--gold2);
+  background:var(--panel2);border:1px dashed var(--gold);border-radius:12px;padding:9px 14px;
+  transition:.15s;
+}
+.rule-box > summary::-webkit-details-marker{display:none}
+.rule-box > summary::before{content:"▶";font-size:9px;color:var(--gold);transition:.15s}
+.rule-box[open] > summary::before{transform:rotate(90deg)}
+.rule-box > summary:hover{border-color:var(--gold2)}
+.rule-box > summary .rb-tip{font-weight:400;font-size:12px;color:var(--text2)}
+.rule-box > summary .rb-tip::after{content:"（点击展开）"}
+.rule-box[open] > summary{position:sticky;top:0;z-index:2;border-bottom-left-radius:0;border-bottom-right-radius:0;border-bottom-style:none;background:var(--panel2)}
+.rule-box[open] > summary .rb-tip::after{content:"（点击收起）"}
+.rule-box > .hint-box{margin-top:0;border-top-left-radius:0;border-top-right-radius:0;border-top:none}
+.rule-box[open] > .hint-box{max-height:52vh;overflow:auto}
 label{font-size:13px;color:var(--text2);display:block;margin:12px 0 6px}
 input[type=text],textarea,select{
   width:100%;padding:11px 13px;border-radius:10px;border:1px solid var(--line);
@@ -338,6 +364,22 @@ footer code{color:var(--gold2)}
 .overlay:not(.spell-only) .fb{flex:0 1 auto;min-height:0;max-height:24vh;overflow-y:auto}
 .overlay:not(.spell-only) .spell-input{flex:3 1 auto;min-height:80px;font-size:56px;letter-spacing:6px;padding:26px 16px}
 .overlay:not(.spell-only) #inOther{flex:2 1 auto;min-height:60px;font-size:13px;max-height:none}
+/* 矮视口（笔记本小屏）进一步压缩测试页，保证「开始测试」按钮在首屏 */
+@media (max-height:780px){
+  main{padding:12px 28px 40px}
+  .tabs{padding:10px 28px 0}
+  .tabs button{padding:8px 20px;font-size:13px}
+  #tab-test .card{padding:13px 18px}
+  #tab-test .card h2{font-size:14px;margin-bottom:6px}
+  #tab-test .picked-bar{padding:8px 12px}
+  #tab-test .picked-bar .pk-name{font-size:14px}
+  #tab-test .picked-bar .pk-meta{font-size:11px}
+  #tab-test label{margin:6px 0 3px;font-size:12px}
+  #tab-test input[type=text],#tab-test select{padding:7px 10px;font-size:13px}
+  #tab-test .form-grid{gap:0 14px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+  .rule-box{margin-top:8px}
+  .rule-box > summary{padding:7px 12px;font-size:12px}
+}
 @media print{header,.tabs,footer,.no-print{display:none!important}}
 </style>
 </head>
@@ -529,7 +571,9 @@ footer code{color:var(--gold2)}
           </div>
         </div>
       </div>
-      <div class="hint-box" style="margin-top:16px">
+      <details class="rule-box" id="ruleBox">
+        <summary>使用说明与测试规则 <span class="rb-tip"></span></summary>
+        <div class="hint-box">
         <b>选词方式</b>：词库在 <b>「① 词库」页</b> 选定——内置词库挑好书、填好起止序号后点「载入词库」；
         或用自己粘贴导入的自建词库点「使用」。载入后回到本页填写学生姓名、点「开始测试」才开考；本页只显示<b>当前测试词库</b>，可设置抽词数与答题规则。<br>
         <b>抽取规则</b>：每次开始测试都会<b>重新随机打乱单词顺序</b>（勾选「全部」时同样打乱后测试，不会按词库原顺序出题）。<br>
@@ -542,8 +586,9 @@ footer code{color:var(--gold2)}
         形容词 → 名词/动词/副词；副词 → 名词/动词/形容词；其他词性无扩展。扩展词的正确拼写由系统自动判定：
         变形形式（过去式/分词/复数等）按规则 + 常用不规则表生成；<b>词性转换形式从在线词典自动匹配校验</b>
         （联网查询该派生词是否真实存在且为目标词性，需联网；网络异常时自动回退为规则结果，不影响测试）。
-      </div>
-      <div class="form-row" style="margin-top:16px">
+        </div>
+      </details>
+      <div class="form-row" style="margin-top:12px">
         <button class="btn" id="startBtn">▶ 开始测试</button>
         <span class="muted" id="testWarn" style="font-size:12px"></span>
       </div>
