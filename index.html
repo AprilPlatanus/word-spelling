@@ -192,6 +192,40 @@ tr:hover td{background:rgba(212,175,55,.05)}
   background:rgba(212,175,55,.16);color:var(--gold2);border:1px solid rgba(212,175,55,.35)
 }
 .adv-hint .adv-val{color:var(--gold2);font-weight:700;font-size:1.06em}
+
+/* ---- 词库页：内置词库选书 + 范围 ---- */
+.book-btns{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:4px 0 6px}
+.book-btn{
+  text-align:left;padding:12px 14px;border-radius:12px;cursor:pointer;font-family:inherit;
+  background:var(--panel2);border:1px solid var(--line);color:var(--text);transition:.15s;
+}
+.book-btn:hover{border-color:var(--gold);transform:translateY(-1px)}
+.book-btn b{display:block;font-size:14px;margin-bottom:3px;font-weight:700}
+.book-btn span{font-size:12px;color:var(--text2)}
+.book-btn.on{
+  border-color:var(--gold);background:rgba(212,175,55,.13);
+  box-shadow:inset 0 0 0 1px var(--gold), 0 4px 14px rgba(212,175,55,.18);
+}
+.book-btn.on b,.book-btn.on span{color:var(--gold2)}
+.range-row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:12px 0 2px}
+.range-row .lbl{font-size:13px;color:var(--text2);white-space:nowrap}
+.range-row input[type=text]{
+  width:96px;text-align:center;font-weight:700;font-size:15px;letter-spacing:1px;padding:9px 8px;
+}
+.range-row .cnt{font-size:13px;color:var(--text2);white-space:nowrap}
+.range-row .cnt b{color:var(--gold2);font-size:15px}
+.range-row select{width:auto;min-width:150px;flex:0 0 auto;padding:9px 11px;font-size:13px}
+
+/* ---- 测试页：当前词库状态条 ---- */
+.picked-bar{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--gold);
+  border-radius:12px;padding:12px 16px;margin-bottom:6px;
+}
+.picked-bar .pk-lbl{font-size:12px;color:var(--text2)}
+.picked-bar .pk-name{font-size:16px;font-weight:800;color:var(--gold2);margin:3px 0 2px;letter-spacing:.3px}
+.picked-bar .pk-meta{font-size:12px;color:var(--text2)}
+.picked-bar .pk-meta b{color:var(--gold2)}
 .empty{padding:30px;text-align:center;color:var(--text2);font-size:13px;border:1px dashed var(--line);border-radius:12px;margin:14px 0}
 .stat-row{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px}
 .stat{
@@ -341,12 +375,40 @@ footer code{color:var(--gold2)}
   <!-- ========== Tab1 词库 ========== -->
   <section id="tab-lib" class="tab active">
     <div class="card" style="border-left:3px solid var(--gold)">
-      <h2>📚 内置词汇书（无需导入，开箱可用）</h2>
-      <div class="muted" style="font-size:13px;line-height:1.85">
-        网页已内置三本词汇书：<b class="gold-text">初中词汇 1440 词</b>、<b class="gold-text">基础词汇 1200 词</b>、<b class="gold-text">核心词汇 1300 词</b>。<br>
-        直接到「测试」页把 <b>词库来源</b> 选为「内置词汇书」，再挑一本、填上<b>起止序号</b>（或直接用分段快捷选择）即可开始测试。<br>
-        内置词库的释义含 <b>基础释义 + 拔高释义</b> 两档，答题时两者会同时显示（拔高释义只在部分词条存在）。
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <h2 style="margin:0">📚 内置词库</h2>
+        <div class="form-row" style="gap:10px">
+          <span class="muted" style="font-size:12px">3 本 · <b class="gold-text" id="builtinTotal">3940</b> 词</span>
+          <button class="btn ghost sm" id="builtinToggle">隐藏</button>
+        </div>
       </div>
+      <div id="builtinBody" style="margin-top:14px">
+        <div class="book-btns" id="bookBtns"></div>
+        <div id="rangeBox">
+          <div class="range-row">
+            <span class="lbl">范围</span>
+            <input type="text" id="rangeFrom" value="1" inputmode="numeric" placeholder="1">
+            <span class="lbl">–</span>
+            <input type="text" id="rangeTo" value="50" inputmode="numeric" placeholder="50">
+            <span class="cnt">共 <b id="rangeCount">50</b> 词</span>
+            <select id="segSel"></select>
+          </div>
+          <div class="range-info" id="rangeInfo" style="margin:10px 0 0"></div>
+        </div>
+        <div class="form-row" style="margin-top:12px">
+          <button class="btn" id="loadStartBtn">📥 载入并开始</button>
+          <span class="muted" id="builtinHint" style="font-size:12px">按序号选一段（如第 1–100 词），选好词汇书与范围后点「载入并开始」。</span>
+        </div>
+        <div class="muted" style="font-size:12px;line-height:1.8;margin-top:8px">
+          释义含 <b class="gold-text">基础释义 + 拔高释义</b> 两档，答题时同时显示（拔高释义只在部分词条存在，仅作提示、不参与批改）。
+        </div>
+      </div>
+      <!-- 供脚本读取的隐藏字段：词汇书选择 与 词库来源 -->
+      <select id="selBook" style="display:none"></select>
+      <select id="libSource" style="display:none">
+        <option value="builtin">内置词库</option>
+        <option value="custom">自建词库</option>
+      </select>
     </div>
     <div class="card">
       <h2>粘贴单词表（助教输入 · 自建词库）</h2>
@@ -377,6 +439,7 @@ footer code{color:var(--gold2)}
     </div>
     <div class="card">
       <h2>已保存词库</h2>
+      <div class="muted" style="font-size:12px;margin:-6px 0 12px">点「使用」即选中该词库并跳到测试页（标 <b class="gold-text">● 使用中</b> 的是当前选中的词库）。</div>
       <div id="libList"></div>
     </div>
   </section>
@@ -385,22 +448,18 @@ footer code{color:var(--gold2)}
   <section id="tab-test" class="tab">
     <div class="card">
       <h2>开始一次测试</h2>
+      <div class="picked-bar">
+        <div style="min-width:0">
+          <div class="pk-lbl">当前测试词库</div>
+          <div class="pk-name" id="pickedName">—</div>
+          <div class="pk-meta" id="pickedMeta"></div>
+        </div>
+        <button class="btn ghost sm" onclick="switchTab('lib')">📚 到「词库」页换词库</button>
+      </div>
+      <!-- 词库选择在「词库」页完成，这里只保留隐藏字段供脚本读取 -->
+      <div id="wrapLib" style="display:none"><select id="selLib"></select></div>
+
       <div class="form-grid">
-        <div>
-          <label>词库来源</label>
-          <select id="libSource">
-            <option value="builtin">📚 内置词汇书（3 本 · 按序号选范围）</option>
-            <option value="custom">📥 自建词库（粘贴导入）</option>
-          </select>
-        </div>
-        <div id="wrapBook">
-          <label>选择词汇书</label>
-          <select id="selBook"></select>
-        </div>
-        <div id="wrapLib" style="display:none">
-          <label>选择词库</label>
-          <select id="selLib"></select>
-        </div>
         <div>
           <label>学生姓名</label>
           <input type="text" id="studentName" placeholder="例如：李小明" list="studentList">
@@ -415,25 +474,6 @@ footer code{color:var(--gold2)}
             </label>
           </div>
         </div>
-      </div>
-
-      <!-- 内置词汇书：按序号选择测试范围（仅内置模式显示） -->
-      <div id="rangeBox">
-        <div class="form-grid">
-          <div>
-            <label>起始序号</label>
-            <input type="text" id="rangeFrom" value="1" inputmode="numeric" placeholder="1">
-          </div>
-          <div>
-            <label>结束序号</label>
-            <input type="text" id="rangeTo" value="50" inputmode="numeric" placeholder="50">
-          </div>
-          <div>
-            <label>分段快捷选择（每 50 词一段）</label>
-            <select id="segSel"></select>
-          </div>
-        </div>
-        <div class="range-info" id="rangeInfo"></div>
       </div>
       <div class="form-grid">
         <div>
@@ -490,8 +530,8 @@ footer code{color:var(--gold2)}
         </div>
       </div>
       <div class="hint-box" style="margin-top:16px">
-        <b>选词方式</b>：<b>内置词汇书</b>——选择词汇书后填<b>起止序号</b>（如 1 到 50），系统只从该范围的单词里抽题，
-        分段下拉可按每 50 词快速选择；<b>自建词库</b>——使用「词库」页粘贴导入的单词表（两者可随时切换，互不影响）。<br>
+        <b>选词方式</b>：词库在 <b>「① 词库」页</b> 选定——内置词库挑好书、填好起止序号后点「载入并开始」；
+        或用自己粘贴导入的自建词库点「使用」。选好后此处会显示<b>当前测试词库</b>，本页只需设置抽词数与答题规则。<br>
         <b>抽取规则</b>：每次开始测试都会<b>重新随机打乱单词顺序</b>（勾选「全部」时同样打乱后测试，不会按词库原顺序出题）。<br>
         <b>释义提示</b>：内置词汇书答题时会同时显示 <b>基础释义</b> 与 <b>拔高释义</b>（拔高释义只在部分词条存在），
         两档释义都只作提示，<b>不参与批改</b>。<br>
@@ -521,7 +561,7 @@ footer code{color:var(--gold2)}
 </main>
 
 <footer>
-  📌 <b>使用流程</b>：① 在「测试」页选 <b>内置词汇书 + 起止序号</b>（或先到「词库」页粘贴导入自建词库）→ ② 填写学生姓名、设置抽词数 → ③ 学生全屏答题 → ④ 交卷后自动批改，错词自动进入错词本，可一键导出 CSV。<br>
+  📌 <b>使用流程</b>：① 在「① 词库」页选词库——内置词库挑一本、填起止序号后点「载入并开始」，或自建词库点「使用」→ ② 在「② 测试」页填写学生姓名、设置抽词数与答题规则 → ③ 学生全屏答题 → ④ 交卷后自动批改，错词自动进入错词本，可一键导出 CSV，也可一键导入为错词库做二次测试。<br>
   💾 所有数据保存在 <code>本机浏览器 localStorage</code>，不会上传；换浏览器或清除浏览器数据会丢失，请定期导出 CSV 备份。
 </footer>
 
@@ -5105,8 +5145,20 @@ function getRangeEntries(bookName, from, to){
 const LS = {
   libs: 'wt_libraries', recs: 'wt_records', student: 'wt_last_student', pending: 'wt_pending', settings: 'wt_settings'
 };
-let libraries = JSON.parse(localStorage.getItem(LS.libs) || '[]');
-let records   = JSON.parse(localStorage.getItem(LS.recs) || '[]');
+/* 安全读取 localStorage：数据损坏/格式不对时回退为空，避免整页脚本崩溃打不开 */
+function lsJSON(key, fallback){
+  try{
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const v = JSON.parse(raw);
+    return v == null ? fallback : v;
+  }catch(e){
+    try{ console.warn('[GenuineEdu] 本地数据损坏，本次已忽略：' + key, e); }catch(_){}
+    return fallback;
+  }
+}
+let libraries = (()=>{ const a = lsJSON(LS.libs, []); return Array.isArray(a) ? a : []; })();
+let records   = (()=>{ const a = lsJSON(LS.recs, []); return Array.isArray(a) ? a : []; })();
 let session = null;
 let grading = null; // 批改结果
 
@@ -5199,12 +5251,15 @@ $('importBtn').onclick = () => {
 function renderLibList(){
   const box = $('libList');
   if (!libraries.length){ box.innerHTML = '<div class="empty">还没有词库，先在上方粘贴导入。</div>'; return; }
+  // 当前选中的自建词库（内置模式下不高亮任何一行）
+  const curIdx = builtinMode() ? -1 : parseInt($('selLib').value, 10);
   let html = '<table><tr><th>词库名称</th><th>词数</th><th>创建时间</th><th>操作</th></tr>';
   libraries.forEach((l,i)=>{
     const d = new Date(l.createdAt);
-    html += `<tr><td><b>${esc(l.name)}</b></td><td>${l.entries.length}</td>
+    const on = (i === curIdx);
+    html += `<tr><td><b>${esc(l.name)}</b>${on ? ' <span class="gold-text" style="font-size:12px">● 使用中</span>' : ''}</td><td>${l.entries.length}</td>
       <td class="muted">${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}</td>
-      <td><button class="btn ghost sm" onclick="useLib(${i})">使用</button>
+      <td><button class="btn ${on?'':'ghost'} sm" onclick="useLib(${i})">${on?'✓ 使用中':'使用'}</button>
           <button class="btn ghost sm" onclick="showLib(${i})">查看</button>
           <button class="btn ghost sm" onclick="exportLibTXT(${i})">⬇️ 导出 TXT</button>
           <button class="btn ghost sm" onclick="exportLibCSV(${i})">⬇️ 导出 CSV</button>
@@ -5220,8 +5275,9 @@ function renderLibList(){
 }
 function useLib(i){
   $('libSource').value = 'custom';   // 从自建词库启动，需把来源切回自建
-  refreshSourceUI();
   $('selLib').value = String(i);
+  refreshSourceUI();
+  renderLibList();                   // 刷新「使用中」标记
   switchTab('test');
 }
 function showLib(i){
@@ -5251,6 +5307,7 @@ function switchTab(name){
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   $('tab-'+name).classList.add('active');
   if (name==='result') renderResult();
+  if (name==='test') renderPicked();
 }
 
 /* ---------- 测试准备 ---------- */
@@ -5271,6 +5328,64 @@ function rebuildBookSelect(){
   $('selBook').innerHTML = BUILTIN_BOOK_NAMES.map(n=>
     `<option value="${esc(n)}">${esc(n)}（${getBookEntries(n).length} 词）</option>`
   ).join('');
+  rebuildBookBtns();
+  const tot = $('builtinTotal');
+  if (tot) tot.textContent = String(BUILTIN_BOOK_NAMES.reduce((s,n)=>s+getBookEntries(n).length, 0));
+}
+
+/* 三本词汇书的卡片式按钮（词库页点击即选） */
+function rebuildBookBtns(){
+  const box = $('bookBtns');
+  if (!box) return;
+  box.innerHTML = BUILTIN_BOOK_NAMES.map(n=>
+    `<button class="book-btn" data-book="${esc(n)}" onclick="pickBook('${escJs(n)}')"><b>${esc(n)}</b><span>${getBookEntries(n).length} 词</span></button>`
+  ).join('');
+  markBookBtn();
+}
+function markBookBtn(){
+  const cur = currentBookName(), isB = builtinMode();
+  document.querySelectorAll('#bookBtns .book-btn').forEach(b=>{
+    b.classList.toggle('on', isB && b.dataset.book === cur);
+  });
+}
+/* 点击词汇书卡片：切回内置模式并选中该书（换书时范围重置为前 50 词） */
+function pickBook(name){
+  if (!BUILTIN_RAW[name]) return;
+  const changed = $('selBook').value !== name;
+  $('libSource').value = 'builtin';
+  $('selBook').value = name;
+  if (changed){
+    $('rangeFrom').value = '1';
+    $('rangeTo').value = String(Math.min(50, getBookEntries(name).length));
+    rebuildSegOptions();
+  }
+  refreshSourceUI();
+  renderLibList();      // 切回内置后，自建词库的「使用中」标记要取消
+  saveSettings();
+}
+
+/* 当前选中的词库（内置范围 或 自建词库），供测试页状态条显示 */
+function pickedInfo(){
+  if (builtinMode()){
+    const name = currentBookName();
+    const {from, to, total} = clampRange();
+    const n = getRangeEntries(name, from, to).length;
+    return {type:'builtin', label:`${name} 第 ${from}–${to} 词`, total, n};
+  }
+  const i = parseInt($('selLib').value, 10);
+  const l = libraries[i];
+  return {type:'custom', label: l ? l.name : '未选择词库', total: 0, n: l ? l.entries.length : 0};
+}
+function renderPicked(){
+  const p = pickedInfo();
+  const nm = $('pickedName'), mt = $('pickedMeta');
+  if (nm) nm.textContent = p.label;
+  if (mt){
+    mt.innerHTML = p.type === 'builtin'
+      ? `📚 内置词库 · 全书 ${p.total} 词 · 本次词池 <b>${p.n}</b> 词${p.n ? '' : '　<span class="bad">⚠ 该范围没有单词</span>'}`
+      : `📥 自建词库 · <b>${p.n}</b> 词${p.n ? '' : '　<span class="bad">⚠ 还没有可用词库，请到「词库」页导入或选内置词库</span>'}`;
+  }
+  return p;
 }
 
 // 分段快捷下拉：每 50 词一段 + 全部
@@ -5305,23 +5420,30 @@ function updateRangeInfo(syncCount){
   const name = currentBookName();
   const {from, to, total} = clampRange();
   const n = getRangeEntries(name, from, to).length;
-  $('rangeInfo').innerHTML =
+  const ri = $('rangeInfo');
+  if (ri) ri.innerHTML =
     `当前范围：<b>${esc(name)}</b> 第 <b>${from}</b>–<b>${to}</b> 词，该范围共 <b>${n}</b> 个词条（全书 ${total} 词）` +
     (n ? '' : `　<span class="bad">⚠ 该范围没有单词，请检查起止序号</span>`);
+  const rc = $('rangeCount');
+  if (rc) rc.textContent = String(n);
   if (syncCount){
     $('pickCount').value = String(n);
     $('pickAll').checked = false;
   }
+  markBookBtn();
+  renderPicked();
   return {name, from, to, total, n};
 }
 
 function refreshSourceUI(){
   const isB = builtinMode();
-  $('wrapBook').style.display  = isB ? '' : 'none';
-  $('wrapLib').style.display   = isB ? 'none' : '';
-  $('rangeBox').style.display  = isB ? '' : 'none';
-  $('pickAllTxt').textContent  = isB ? '全部（整个范围）' : '全部单词';
+  const wb = $('wrapBook'); if (wb) wb.style.display = isB ? '' : 'none';
+  const wl = $('wrapLib');  if (wl) wl.style.display = 'none';   // 词库在「词库」页选择，此处仅作状态存储
+  const rb = $('rangeBox'); if (rb) rb.style.display = isB ? '' : 'none';
+  const pat = $('pickAllTxt'); if (pat) pat.textContent = isB ? '全部（整个范围）' : '全部单词';
   if (isB) updateRangeInfo(false);
+  markBookBtn();
+  renderPicked();
 }
 
 $('libSource').onchange = () => { refreshSourceUI(); saveSettings(); };
@@ -5346,6 +5468,37 @@ $('rangeFrom').oninput  = () => { $('segSel').value = ''; updateRangeInfo(false)
 $('rangeTo').oninput    = () => { $('segSel').value = ''; updateRangeInfo(false); };
 $('rangeFrom').onchange = () => { updateRangeInfo(true); saveSettings(); };
 $('rangeTo').onchange   = () => { updateRangeInfo(true); saveSettings(); };
+
+/* 「载入并开始」：把词库页选定的内置范围载入，切到测试页；学生姓名已填则直接开考 */
+$('loadStartBtn').onclick = () => {
+  $('libSource').value = 'builtin';
+  refreshSourceUI();
+  const info = updateRangeInfo(true);
+  if (!info.n){ alert('所选范围没有单词，请检查起始 / 结束序号。'); return; }
+  saveSettings();
+  switchTab('test');
+  const name = $('studentName').value.trim();
+  if (name){
+    $('startBtn').click();                 // 姓名已填 → 直接开始
+  } else {
+    $('testWarn').textContent = `已载入「${info.name} 第${info.from}–${info.to}词」（${info.n} 词），填写学生姓名后点「开始测试」。`;
+    $('studentName').focus();
+  }
+};
+
+/* 内置词库面板折叠（记忆状态） */
+const BUILTIN_OPEN_KEY = 'wt_builtin_open';
+function applyBuiltinOpen(){
+  const open = localStorage.getItem(BUILTIN_OPEN_KEY) !== '0';
+  $('builtinBody').style.display = open ? '' : 'none';
+  $('builtinToggle').textContent = open ? '隐藏' : '展开';
+}
+$('builtinToggle').onclick = () => {
+  const open = localStorage.getItem(BUILTIN_OPEN_KEY) !== '0';
+  localStorage.setItem(BUILTIN_OPEN_KEY, open ? '0' : '1');
+  applyBuiltinOpen();
+};
+applyBuiltinOpen();
 
 function renderStudentList(){
   const names = [...new Set(records.map(r=>r.student).filter(Boolean))];
@@ -5406,7 +5559,7 @@ $('startBtn').onclick = async () => {
     lib = {name: `${info.name} 第${info.from}–${info.to}词`, entries};
   } else {
     const i = parseInt($('selLib').value,10);
-    if (isNaN(i) || !libraries[i]){ alert('请先在「词库」页粘贴导入单词表，再选择词库；或把「词库来源」改为内置词汇书。'); switchTab('lib'); return; }
+    if (isNaN(i) || !libraries[i]){ alert('还没有可用的自建词库。请到「① 词库」页粘贴导入单词表，或直接使用内置词库。'); switchTab('lib'); return; }
     lib = libraries[i];
   }
   const student = $('studentName').value.trim();
