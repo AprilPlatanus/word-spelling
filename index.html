@@ -181,6 +181,17 @@ tr:hover td{background:rgba(212,175,55,.05)}
 .bad{color:var(--bad);font-weight:700}
 .muted{color:var(--text2)}
 .gold-text{color:var(--gold2);font-weight:700}
+.range-info{
+  font-size:13px;color:var(--text2);background:var(--panel2);border:1px solid var(--line);
+  border-left:3px solid var(--gold);border-radius:8px;padding:9px 12px;margin:2px 0 10px
+}
+.range-info b{color:var(--gold2)}
+.adv-hint{display:block;margin-top:7px;font-size:.88em;color:var(--text2)}
+.adv-hint .adv-tag{
+  display:inline-block;font-size:.82em;padding:1px 7px;border-radius:5px;margin-right:6px;
+  background:rgba(212,175,55,.16);color:var(--gold2);border:1px solid rgba(212,175,55,.35)
+}
+.adv-hint .adv-val{color:var(--gold2);font-weight:700;font-size:1.06em}
 .empty{padding:30px;text-align:center;color:var(--text2);font-size:13px;border:1px dashed var(--line);border-radius:12px;margin:14px 0}
 .stat-row{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px}
 .stat{
@@ -329,8 +340,16 @@ footer code{color:var(--gold2)}
 <main>
   <!-- ========== Tab1 词库 ========== -->
   <section id="tab-lib" class="tab active">
+    <div class="card" style="border-left:3px solid var(--gold)">
+      <h2>📚 内置词汇书（无需导入，开箱可用）</h2>
+      <div class="muted" style="font-size:13px;line-height:1.85">
+        网页已内置三本词汇书：<b class="gold-text">初中词汇 1440 词</b>、<b class="gold-text">基础词汇 1200 词</b>、<b class="gold-text">核心词汇 1300 词</b>。<br>
+        直接到「测试」页把 <b>词库来源</b> 选为「内置词汇书」，再挑一本、填上<b>起止序号</b>（或直接用分段快捷选择）即可开始测试。<br>
+        内置词库的释义含 <b>基础释义 + 拔高释义</b> 两档，答题时两者会同时显示（拔高释义只在部分词条存在）。
+      </div>
+    </div>
     <div class="card">
-      <h2>粘贴单词表（助教输入）</h2>
+      <h2>粘贴单词表（助教输入 · 自建词库）</h2>
       <div class="hint-box">
         每行一个单词，格式：<b>单词 + 词性 + 中文释义</b>，多个词性释义依次排列。<br>
         词性支持英文缩写（v. / n. / adj. / adv. / vt. / vi. / prep. …）或中文（动词 / 名词 / 形容词…），<br>
@@ -368,6 +387,17 @@ footer code{color:var(--gold2)}
       <h2>开始一次测试</h2>
       <div class="form-grid">
         <div>
+          <label>词库来源</label>
+          <select id="libSource">
+            <option value="builtin">📚 内置词汇书（3 本 · 按序号选范围）</option>
+            <option value="custom">📥 自建词库（粘贴导入）</option>
+          </select>
+        </div>
+        <div id="wrapBook">
+          <label>选择词汇书</label>
+          <select id="selBook"></select>
+        </div>
+        <div id="wrapLib" style="display:none">
           <label>选择词库</label>
           <select id="selLib"></select>
         </div>
@@ -377,14 +407,33 @@ footer code{color:var(--gold2)}
           <datalist id="studentList"></datalist>
         </div>
         <div>
-          <label>抽取单词数量（1–1000）</label>
+          <label>抽取单词数量（不超过所选范围词数）</label>
           <div class="form-row" style="gap:8px">
             <input type="text" id="pickCount" value="50" placeholder="50" inputmode="numeric" style="flex:1;min-width:0">
             <label style="margin:0;font-size:13px;display:flex;align-items:center;gap:5px;white-space:nowrap;cursor:pointer">
-              <input type="checkbox" id="pickAll" style="width:auto;accent-color:var(--gold)"> 全部单词
+              <input type="checkbox" id="pickAll" style="width:auto;accent-color:var(--gold)"> <span id="pickAllTxt">全部单词</span>
             </label>
           </div>
         </div>
+      </div>
+
+      <!-- 内置词汇书：按序号选择测试范围（仅内置模式显示） -->
+      <div id="rangeBox">
+        <div class="form-grid">
+          <div>
+            <label>起始序号</label>
+            <input type="text" id="rangeFrom" value="1" inputmode="numeric" placeholder="1">
+          </div>
+          <div>
+            <label>结束序号</label>
+            <input type="text" id="rangeTo" value="50" inputmode="numeric" placeholder="50">
+          </div>
+          <div>
+            <label>分段快捷选择（每 50 词一段）</label>
+            <select id="segSel"></select>
+          </div>
+        </div>
+        <div class="range-info" id="rangeInfo"></div>
       </div>
       <div class="form-grid">
         <div>
@@ -441,7 +490,11 @@ footer code{color:var(--gold2)}
         </div>
       </div>
       <div class="hint-box" style="margin-top:16px">
-        <b>抽取规则</b>：每次开始测试都会<b>重新随机打乱单词顺序</b>（勾选「全部单词」时同样打乱后测试，不会按词库原顺序出题）。<br>
+        <b>选词方式</b>：<b>内置词汇书</b>——选择词汇书后填<b>起止序号</b>（如 1 到 50），系统只从该范围的单词里抽题，
+        分段下拉可按每 50 词快速选择；<b>自建词库</b>——使用「词库」页粘贴导入的单词表（两者可随时切换，互不影响）。<br>
+        <b>抽取规则</b>：每次开始测试都会<b>重新随机打乱单词顺序</b>（勾选「全部」时同样打乱后测试，不会按词库原顺序出题）。<br>
+        <b>释义提示</b>：内置词汇书答题时会同时显示 <b>基础释义</b> 与 <b>拔高释义</b>（拔高释义只在部分词条存在），
+        两档释义都只作提示，<b>不参与批改</b>。<br>
         <b>测试规则</b>（与助教人工流程一致）：每词随机展示 <b>一个词性 + 中文释义</b>（或选择全部显示），并给出
         <b>不超过单词字母数一半</b> 的字母提示；学生在提示的空格上<b>直接补全单词</b>，如为随机显示模式还需写出
         <b>其余的词性和对应中文释义</b>。每答完一题立即显示对错与正确答案，全程不可返回上一题。全部完成后自动批改、记录错词。<br>
@@ -468,7 +521,7 @@ footer code{color:var(--gold2)}
 </main>
 
 <footer>
-  📌 <b>使用流程</b>：① 在「词库」页粘贴单词表 → ② 在「测试」页选择词库、填写学生姓名、设置抽词数 → ③ 学生全屏答题 → ④ 交卷后自动批改，错词自动进入错词本，可一键导出 CSV。<br>
+  📌 <b>使用流程</b>：① 在「测试」页选 <b>内置词汇书 + 起止序号</b>（或先到「词库」页粘贴导入自建词库）→ ② 填写学生姓名、设置抽词数 → ③ 学生全屏答题 → ④ 交卷后自动批改，错词自动进入错词本，可一键导出 CSV。<br>
   💾 所有数据保存在 <code>本机浏览器 localStorage</code>，不会上传；换浏览器或清除浏览器数据会丢失，请定期导出 CSV 备份。
 </footer>
 
@@ -1037,6 +1090,4018 @@ async function enrichExtWithDict(questions, onProgress){
 <script>
 /* ================= UI / DOM 逻辑 ================= */
 const $ = id => document.getElementById(id);
+
+/* ================= 内置词汇书（数据源：词库.xlsx 的三张工作表） =================
+   每行格式：单词 <TAB> 基础释义 [<TAB> 拔高释义]，行的先后顺序即原表「序号」，不可重排 */
+const BUILTIN_RAW = {
+  "初中词汇": `junior	adj. 资历较浅的、年幼的
+season	n. 季节
+dentist	n.牙科医生
+worth	adj. 值……的
+bleed	v. 流血、掺混[bled - bled]
+see	v. 看见、明白[saw - seen]
+area	n. 地区
+lend	v. 出借、给予[lent - lent]
+tourist	n. 游客
+scientist	n. 科学家
+mile	n. 英里
+example	n. 例子
+aim	n. 目标 v. 瞄准
+blood	n. 血液
+scare	v. 惊吓
+reply	n.&v. 回复
+achieve	v. 获取
+die	v. 死掉
+fresh	adj. 新鲜的
+top	n. 顶端
+nothing	n. 没有东西
+boss	n. 老板
+depend	v. 依赖
+silent	adj. 沉默无声的
+honour	n. 光荣v. 尊敬
+weight	n. 重量
+think	v. 认为[thought - thought]
+activity	n. 活动
+brave	adj. 勇敢的
+still	adv. 仍然 adj. 静止的
+hang	v. 悬挂、垂下[hung - hung]
+happen	v. 发生、碰巧 [happen to do sth]
+oven	n. 烤炉
+judge	v. 判断 n. 法官
+empty	adj. 空的 v. 倒空
+sky	n. 天空
+newspaper	n. 报纸
+fantastic	adj. 极好的
+treat	v. 对待、诊治、处理
+engineer	n. 工程师
+connect	v. 连接
+hobby	n.业余爱好
+wear	n.&v. 磨损[wore - worn]
+click	v. 点击
+scared	adj.恐惧的
+uncomfortable	adj. 不舒适的
+chew	v. 咀嚼
+rude	adj.粗鲁的
+thief	n. 小偷
+junk	n. 垃圾 [junk food 垃圾食品]
+captain	n. 船长
+pupil	n. 学生
+dish	n.（盘中的）食物
+include	v. 包括
+race	n. 竞赛、种族
+tonight	adv. 在今晚
+map	n. 地图
+step	n. 步（骤、伐）、阶段
+refuse	v. 拒绝
+difference	n. 不同
+teamwork	n. 团队合作
+uncle	n. 叔叔
+green	n. 绿色
+effort	n. 努力
+grammar	n. 语法
+abroad	adj. / adv. 国外
+cough	n&v. 咳嗽
+like	v.&n. 喜欢 prep. 像、例如
+join	v. 加入、（使）结合
+nervous	adj. 神经的、神经紧张的
+soon	adv. 不久
+elder	adj. 年长的
+restaurant	n. 餐馆
+weekday	n. 工作日
+finish	v.&n. 完成
+deep	adj. 深的
+wind	n. 风
+new	adj. 新的
+want	v. 想要
+divide	v. （使）分开
+company	n. 公司、陪伴
+listen	v. 听
+fox	n. 狐狸
+grape	n. 葡萄
+fruit	n. 水果、成果
+environment	n. 环境
+lesson	n. 课、教训
+attention	n. 注意力
+cloudy	adj. 多云的	adj. 浑浊的
+actually	adv. 实际上、事实上
+memory	n. 记忆力
+strategy	n. 战略
+complain	v. 抱怨
+essay	n. 短文
+poster	n. 海报
+destroy	v. 摧毁
+bush	n. 灌木
+iron	n. 铁、熨斗 v. 熨烫
+cigarette	n. 香烟
+dare	v. 敢于
+documentary	adj. 纪实的 n. 纪录片
+survive	v. 存活
+correct	adj. 正确的v. 改正
+early	adj.&adv. 早（期）（的）
+shine	v. 闪耀 [shone - shone]
+value	n. 价值、（数）值
+review	v.&n. 回顾、评论
+board	n. 板、布告栏
+design	n. 设计
+worse	adj. 更差（的）[bad的比较级]
+finger	n. 手指
+daughter	n. 女儿
+impossible	adj. 不可能的
+negative	adj. 负面的、阴性的
+meat	n. 肉
+size	n. 大小、规模
+child	n. 小孩 [pl. children]
+university	n. 大学
+view	n. 观点、视野
+parent	n. 父母
+sugar	n. 糖
+wall	n. 墙、壁
+youth	n. 青春期
+fact	n. 事实
+course	n. 过程、航道、课程
+repeat	v. 重复
+tooth	n. 牙齿 [pl. teeth]
+move	v.&n. 移动
+suggest	v. 提出、表明	v. 暗示、认为
+recent	adj. 最近的
+push	v. 推
+sit	v. 坐 [sat - sat]
+again	adv. 又
+bright	adj. 明亮的、鲜艳的
+pink	n. 粉色
+late	adj. 晚的、迟的
+clock	n. 钟
+event	n. 事件
+horse	n. 马
+soil	n. 土壤
+friendly	adj. 友好的
+lap	n. （坐着时的）大腿部；（跑道的）一圈
+eastern	adj. 东部的
+tutor	n. 导师 v. 辅导
+comment	n&v. 评论
+furry	adj. 毛茸茸的
+heel	n. 鞋跟
+slide	n. 滑动 v.滑动[slid - slid]
+pronoun	n. 代词（例如 it, me, their等）
+topic	n. 话题
+skin	n. 皮肤
+admire	v. 敬佩、欣赏
+standard	n. 标准、水平
+wise	adj. 明智的
+spread	n&v. 扩散 [spread - spread]
+ache	n&v.疼痛
+queen	n. 女王、蜂王
+fear	v.&n. 害怕
+warn	v. 提醒
+way	n. 方式、方面、路
+hurry	n&v.匆忙
+business	n. 生意、事务、企业
+skirt	n. 裙子
+soldier	n. 士兵
+industry	n. 行业、工业
+ask	v. 问
+bottom	n. 底（部、层）
+alone	adj&adv. 独自的
+whale	n. 鲸鱼
+cow	n. 奶牛
+sudden	adj. 突然的
+mark	n.&v. 标志、标记
+since	conj. 自从、因为；prep. 自从
+belong	v. 属于
+double	v. 翻倍 n.&adj. 两倍（的）
+face	v. 面对 n. 脸	n. 侧面
+soup	n. 汤
+east	n.&adj. 东方（的）
+proud	adj. 骄傲的
+shy	adj.害羞的
+ever	adv.曾经
+small	adj. 小的
+space	n. 空间、太空
+key	adj. 关键的 n. 钥匙
+enjoy	v. 享受、享有	v. 经历
+old	adj. 老的、...岁的（比如20 years old)
+game	n. 野生动物、游戏
+harm	n.&v. 伤害
+ugly	adj. 丑陋的
+people	n. 人、民族
+bird	n. 鸟
+eagle	n. 鹰
+instance	n. 例子 （for instance = for example，例如）
+march	v. 行军、三月（March-注意首字母大写）
+conference	n. 会议
+represent	v. 代表、描绘
+universe	n. 宇宙
+trouble	n. 麻烦
+fight	v.&n. 打架
+pronounce	v. 发音	v. (正式）宣布
+duck	n. 鸭子
+fast	adj.&adv. 快速（的）	adj.&adv. 牢固（的）
+foot	n. 脚、英尺[pl. feet]
+million	n. 百万
+international	adj. 国际的
+open	adj. （打、公）开的	adj. (比如胳膊）张开的、（土地）开阔的
+birthday	n. 生日
+station	n. （车）站
+nice	adj. 好的、合意的
+tree	n. 树
+breath	n. 呼吸
+capital	n. 资本、首都
+elephant	n. 大象
+block	n. 块 v.阻挡
+let	v. 让 [let - let]
+maybe	adv. 也许
+lose	v. 失去、输掉[lost - lost]
+rich	adj. 富有的、丰富的	adj. 富（含、饶、强）的、肥沃的
+woman	n. 女性[pl. women]
+line	n. 线条、系列 （a line of ...）	v. 沿……排成一行
+exercise	v.&n. 行使、训练、锻炼
+spend	v. 花（时间、能量、金钱）[spent - spent]
+improve	v. 改进、提高
+actor	n. 演员
+absent	adj. 不存在的
+actress	n. 女演员
+own	adj. 自己的
+sense	n. 意识
+loss	n.（丧、损）失
+suppose	v. 假设
+slice	v. 切割 n. 块（a slice of meat）
+amount	n. 数量
+queue	n. （人或车辆的）队列
+sail	n. 帆 v. 航行
+equipment	n. 装备（不可数名词）
+owner	n. 所有者
+specially	adv. 特别地
+waste	n. 废物、浪费
+desert	n. 沙漠
+love	n.&v. 爱
+library	n. 图书馆
+alarm	n. 警报
+twice	adv. 两次
+star	n. 星星
+subject	n. 主题
+danger	n. 危险
+succeed	v. 成功、接替
+avoid	v. 避（免、开）
+tape	n. 磁带
+narrow	adj. 窄的
+month	n. 月
+remain	v. 保持、继续
+wound	v. 伤害
+advice	n. 建议
+know	v. 知道[knew - known]
+arm	n. 胳膊、臂状物	n. 武器 v. 装备
+quick	adj. 快的
+care	n. 照顾
+budget	n. 预算
+silk	n. 丝绸
+band	n. 乐队、群体
+guest	n. 客人
+produce	v. 生产
+river	n. 河流
+champion	n.冠军
+group	n. 群（体）、组
+local	adj. 当地的、地方的
+probably	adv. 可能地
+member	n. 成员
+especially	adv. 特别是、尤其
+thank	v. 感谢
+material	n.&adj. 物质（的）、材料（的）
+speech	n. 说话
+classic	adj. 经典的
+army	n. 军队
+flee	v. 逃离[fled - fled]
+coast	n. 海岸
+litter	n. 废弃物
+yesterday	n.&adv. 昨天
+outstanding	adj. 杰出的
+specific	adj. 特定的、明确的
+distance	n. 距离
+servant	n. 仆人
+emotion	n. 感情
+immediately	adv. 立即地	adv. 紧急地、紧邻地
+extra	adj. 额外的
+phrase	n. 短语
+latest	adj. 最近的
+string	n. 串、（乐器的）弦
+wet	adj. 湿的
+travel	v.&n. 旅行、行进
+suit	v. 适合 n. 西装	n. 套（a suit of software 一套软件）
+flood	n. 洪水
+bank	n. 银行、河岸	n. 库存
+dinner	n. 晚餐
+fly	v. 飞 [flew - flown] n. 苍蝇
+couple	n. （一）对（夫妇）	a couple of ... 一对……
+calm	adj. 平静的 v. 平静
+symbol	n. 象征（物）、符号
+young	adj. 年幼的 n. 幼崽
+snack	n. 小吃
+receive	v. 接收到
+ear	n. 耳朵
+plate	n. （地质）板块、盘子
+machine	n. 机器
+walk	v.&n. 行走
+zero	n. 无、零
+wait	n.&v. 等候
+laugh	v.&n. 笑
+asleep	adj. 睡着的
+private	adj. 私有的
+recognise	v. 认出、认可
+eat	v. 吃 [ate - eaten]
+translate	v. 翻译、转变
+knife	n. 刀[pl. knives]
+feel	v. 感觉、认为 [felt - felt]
+milk	n. （人或动物的）奶
+rush	n. 匆忙
+drop	v. 迅速下降、放下 n. 迅速下降、滴
+familiar	adj. 熟悉的、常见的
+post	adj. 后……[构词] （例如：post-war 战争后的）
+egg	n. 蛋、卵
+cut	v. 切、割、削减[cut - cut]
+method	n. 方法
+cream	n. 奶油
+scene	n. 景象、场面
+thrill	n.&v. 激动
+jungle	n. 丛林
+dismiss	v. 不理会
+plain	n. 平原
+unpleasant	adj. 令人不愉快的
+natural	adj. 天然的
+indoors	adv. 在室内
+type	n. 种类
+jazz	n. 爵士
+display	v. & n. 展示
+province	n. 省（比如 Hunan Province 湖南省）
+easily	adv. 容易地
+tale	n. 故事
+emperor	n. 皇帝
+empress	n. 皇后
+huge	adj. 巨大的
+degree	n.（程、温）度、学历	n. 纬度
+lie	v. 位于、处于（某种状态）
+body	n. 身体、主体（比如：the main body of the building 这个建筑的主体）、团体
+shoulder	n. 肩膀
+hit	v. 打、击 [hit - hit]
+hand	n. 手
+bat	n. 蝙蝠
+organise	v. 组织、整理
+stay	v. 保持（状态）、停留
+brother	n. 兄弟
+law	n. （法、规、定）律
+son	n. 儿子
+comfortable	adj. 舒适的	adj. 宽裕的
+hardly	adv. 几乎（不、没有）
+drive	v. 开车、驱动、驱赶[drove - driven] n. 动力
+store	n. 商店 v. 储存
+noise	n. 噪音、声音
+fire	n. 火（灾）v. 燃烧、烧制
+firework	n. 烟花
+stamp	n. 印章
+leg	n. 腿
+medal	n. 奖牌
+remember	v. 记得、回想起
+smart	adj. 聪明的、快的
+ton	n. 吨
+wealth	n. 财富
+forever	adv. 永远地
+worry	v. 担心
+bear	n. 熊 v. 生（孩子）[bore-born]、忍受
+joy	n. 喜悦
+direct	adj. 直接的
+class	n. 班级、阶级	n. 种类
+amazing	adj. 惊人的
+agree	v. 同意
+set	v. 放置、设置 [set set]	v. 使处于……、确定
+life	n. 生命、生活、一生
+dream	n. 梦 v. 做梦
+metal	n. 金属
+tag	n. 标签
+pretend	v. 假装
+dull	adj. 沉闷的
+staff	n. 员工
+tent	n. 帐篷
+television	n. 电视
+particular	adj. 特定的
+authority	n. 权威
+edge	n. 边缘
+relation	n. 关系、亲属
+humour	n.幽默
+hospital	n.医院
+helpful	adj. 有益的
+throat	n.咽喉
+general	adj. 普遍的、大体的
+pity	n. 遗憾的事
+little	adj.&pron. 少（的）、小（的） adv. 不多
+cool	adj. 凉的
+problem	n. 问题
+sleep	v. 睡觉[slept - slept]
+apartment	n. 公寓
+dollar	n. 美元
+person	n. 人
+virus	n. 病毒
+support	v.&n. 支持、支撑
+fail	v. 失败、倒闭
+wife	n. 妻子
+characteristic	n. 特征
+pretty	adv. 相当地 adj. 漂亮的
+sick	adj. 生病的
+lamp	n. 灯
+silver	n. 银
+wood	n. 木头、树林
+cost	n. 费用、代价 v. 花费
+argue	v. 论证 （argue that 认为；argue against 反对……；argue for 支持……）
+influence	n.&v. 影响
+Internet	n. 互联网
+bring	v. 使……来到……、带来[brought - brought]
+account	n. 账目、记录
+state	n. 状态、州 v.陈述
+kitchen	n. 厨房
+market	n. 市场
+chocolate	n. 巧克力
+task	n. 任务
+nurse	n. 护士
+cook	v. 烹饪
+stop	v. 停止
+already	adv. 已经
+father	n. 父亲
+buy	v. 购买 [bought - bought]
+candy	n. 糖果
+potato	n. 土豆
+price	n. 价格
+western	adj. 西边的
+pierce	v. 穿透
+root	n. 根、根源
+email	n. 邮件
+war	n. 战争
+arrive	v. 到达
+offend	v. 冒犯
+mystery	n. 谜团
+exchange	n.&v. 交换
+overseas	adv.&adj. 海外（的）
+confidence	n. 信心
+imagine	v. 想像
+fall	v. 落下 [fell - fallen] n. 落下、秋季	v. 垮台、进入（某种状态） n. 垮台
+communicate	v. 交流、传达
+umbrella	n. 雨伞
+house	n. 房屋
+salt	n. 盐
+head	n. 头部、负责人、（谷物的）穗
+pioneer	n. 先锋、倡导者
+ahead	adv. 在前面地
+award	n. 奖 v. 奖励
+oil	n. 油
+speed	n. 速度 v. 加速
+balloon	n. 气球
+village	n. 村庄
+cancel	v. 使作废
+traffic	n. 交通、运输
+sofa	n. 沙发
+knock	v.&n. 敲
+score	n. 得分、二十
+necessary	adj. 必要的
+check	v. 核对、检查	n. 抑制、支票
+vegetable	n. 蔬菜
+article	n. 物品、文章
+hot	adj. 热的
+pot	n. 罐
+change	n. 改变
+thousand	num. 千
+except	prep. 除…… 外
+music	n. 音乐
+position	n. 位置	n. 观点、状况
+anywhere	adv. 任何地方
+forest	n. 森林
+red	n. & adj. 红色（的）
+morning	n. 早上
+leave	v. 离开、留下、使处于……状态 [left - left]
+beautiful	adj. 漂亮的
+form	n. 形式 v. 形成
+unfamiliar	adj. 不熟悉的、不常见的
+always	adv. 总是
+examine	v. 仔细检查
+shell	n. 壳
+pond	n. 池塘
+cage	n. 笼子
+unable	adj. 不能……的
+embarrassed	adj. 尴尬的
+bother	v.（使）烦恼
+sort	n. 种类 v. 分类
+attack	v. 袭击
+gentleman	n. 绅士
+today	n. 今天、当今
+family	n. 家庭、（动植物）科
+lunch	n. 午餐
+sand	n. 沙子
+fit	v.&n.&adj. 适合（的）v. 安装
+pair	n. 双、对
+character	n. 人物、特征
+study	n. & v. 研究
+turn	v. （使）转动、转向（turn left)	v. 扭转（局面等）、（使）变成……（turn blue 变成蓝色）
+expect	v. 预料、期待
+video	n. 视频
+tomorrow	n.&adv. 明天
+boil	v. 煮（沸）
+beat	v. 敲打、（心脏等）跳动 [beat - beaten]
+leaf	n. 叶子[pl. leaves]
+right	adj. 正确的
+excellent	adj. 极好的
+heat	n. 热 v. 加热
+society	n. 社会、群体
+polite	adj. 礼貌的
+shop	n. 店
+chip	n. 芯片、缺口
+letter	n. 字母、信件	v. 用字母写
+start	n. 开始
+date	n. 日期 v. 确定日期（date to + 时间 追溯到……）
+answer	n. 答案
+cousin	n. 堂（表）兄弟姐妹
+style	n. 风格
+flat	adj. 平的
+sock	n. 袜子
+ruler	n. 统治者
+tired	adj. 疲劳的
+semester	n. 学期
+manage	v. 管理、设法达成（manage to do sth）	v. 运用
+theme	n. 主题
+lifestyle	n. 生活方式
+pop	v.（突然）出现
+resolution	n. 分辨率	n. 决议、解决
+predict	v. 预言、预示
+attendant	n. 侍从	adj. 伴随的
+traditional	adj. 传统的
+publish	v. 出版
+shelf	n. 架 [pl. shelves]
+active	adj. 活跃的、积极的
+bread	n. 面包
+cinema	n. 电影（院）
+sale	n. 销售
+bus	n.公共汽车
+museum	n. 博物馆
+violin	n. 小提琴
+piece	n. （文章或者艺术品的）块、片、首（等单位） [本身没有碎片的意思]
+risk	n. 风险
+phone	n. 电话
+opposite	adj. 相反的 n. 对立面
+teacher	n. 教师
+chair	n. 椅子
+monkey	n. 猴子
+primary	adj. 主要的、最初的
+tool	n. 工具
+end	n. 结尾 v. 终止	n. 末端、目的 v. 结束
+address	n. 地址
+ticket	n. 票
+throw	v. 扔、投[threw - thrown]
+present	v. 呈现 n. 礼物
+underground	adj. & adv. 地下（的）
+nose	n. 鼻子
+sunny	adj. 阳光充足的
+literature	n. 文学
+floor	n. 地(面、板）、楼层	n. （海）底 v. 给……铺地面
+information	n. 信息
+simple	adj. 简单的
+club	n. 俱乐部
+public	adj. 公开的、公众的
+hundred	n. 百
+biology	n. 生物学
+notice	v. 注意到
+dance	n.&v. 舞蹈
+camp	n. 营地	v. 扎营
+airport	n. 飞机场
+similar	adj. 相似的
+bee	n. 蜜蜂
+press	n. 报纸 v.按	n. 打印机、出版社
+ill	adj. 生病的
+path	n. 路径
+national	adj. 全国的
+modest	adj. 谦逊的、适度的
+disturb	v. 妨碍、扰乱
+opportunity	n. 机会
+curious	adj. 好奇的、令人不解的
+wide	adj. 广泛的
+able	adj. 能（够）……的
+period	n. 时期
+north	n. 北（方、部）（的）
+pride	n. 骄傲
+relax	v.放松
+rock	n. 岩石
+meet	v. 遇见、满足[met - met]
+pork	n. 猪肉
+bed	n. 床、（河、湖）床	n.（岩）层
+pour	v. 倒、喷涌
+play	v. 玩耍、发挥（play a xx role in 在……里面发挥了……作用）、播放	n. 戏剧 v. 表演
+against	prep. 与……相反、违背
+jump	v. 跳
+copy	v. 复制、模仿
+clever	adj. 聪明的
+coin	n. 硬币	v. 创造
+find	v.发现[found - found]
+borrow	v. 借、借用 (思想、词等)
+alive	adj. 活着的
+blow	v. 吹[blew - blown]
+name	n. 名字
+future	n. 未来
+service	n. 服务
+gold	n. 金子
+climb	v. 爬、上涨
+catch	v. 抓住、赶上[caught - caught] [catch up with sth 追上]
+chicken	n. 鸡（肉）
+slow	v.（使）减缓
+bottle	n. 瓶子
+news	n. 新闻 [本身是一个词，不是new的复数]
+beef	n. 牛肉
+casually	adv. 随意地
+frustrate	v. 挫败
+attempt	v.&n. 试图、努力
+goat	n. 山羊
+professional	adj. 职业的、专业的
+mail	n. 邮政
+upset	v. 扰乱[upset - upset]
+disaster	n. 灾难
+honest	adj. 诚实的
+watch	v. 观看、观察 n. 手表
+table	n. 表格、桌子
+forget	v. 忘记[forgot - forgotten]
+story	n. 故事
+voice	n. 嗓音
+lady	n. 女士
+song	n. 歌曲、鸟鸣声
+folk	n. 人 adj. 民间的（folk stories 民间故事）
+prove	v. 证明（是）
+main	adj. 主要的
+solve	v. 解决
+hotel	n. 旅馆
+language	n. 语言
+talent	n. 天赋
+pencil	n. 画笔
+normal	adj. 正常的
+south	n. 南
+door	n. 门
+cent	n. （美）分
+funny	adj. 有趣的、奇怪的
+brown	n. 棕色
+question	n. 问题 v. 提问、质疑
+planet	n. 行星
+candle	n. 蜡烛
+temperature	n. 温度
+day	n. 白天、日
+skill	n. 技能
+astronaut	n. 宇航员
+explain	v. 解释
+summer	n. 夏季
+grow	v. 种植（……- vt）、成长（vi） [grew - grown]	v. 增加、变得
+famous	adj. 著名的
+piano	n. 钢琴
+dislike	n. & v. 不喜欢
+border	n. 边界
+educate	v. 教育
+frog	n. 青蛙
+drug	n. 药
+rent	n. 租金、出租
+northern	adj. 北的
+garage	n. 车库
+quiet	adj. 安静的
+short	adj. 短的、矮的、短缺的
+truth	n. 实情
+fun	n. 乐趣
+prefer	v. 更喜欢
+relative	adj. 相对的
+shower	n. 淋浴
+cold	adj. 寒冷的
+magazine	n. 杂志
+please	v.（使）满意
+window	n. 窗、最佳时机
+close	adj. 近的、亲密的 v. 关闭
+tail	n. 尾巴
+plant	n. 植物、工厂
+develop	v. 发展
+page	n. （纸）页
+freeze	v.（使）结冰、冻结[froze - frozen]
+voluntary	adj. 自愿的（voluntary work 志愿活动）	adj. 随意的
+fill	v. 填满
+place	n. 地方 v. 放置……
+chat	v. 闲聊
+rubbish	n. 垃圾
+truck	n. 卡车	v. 用卡车运输
+plane	n. 飞机、平面
+joke	n. 笑话
+point	n. （地、观）点	n. 时刻、尖端
+spoon	n. 勺子
+manner	n. 方式、举止
+gas	n. 气体
+graduate	v. 毕业	v. 渐变
+pleasure	n. 愉悦
+success	n. 成功
+field	n. 田地、领域 adj. 实地的（field work 实际研究）
+year	n. 年、岁
+turtle	n. 龟
+humorous	adj. 幽默的
+possibly	adv. 可能
+trash	n. 垃圾
+department	n. 部门
+clothing	n. 衣服
+outdoor	adj. 户外的
+concentrate	v. 聚集
+energetic	adj. 有活力的、能量的
+college	n. 大学
+effect	n. 影响
+strong	adj. 强有力的、强烈的
+fool	v. 愚弄 n. 傻子
+reason	n. 原因
+socialism	n. 社会主义
+picture	n. 图片、情况	v. 描述、想象
+cloud	n. 云
+send	v. 发送[sent - sent]
+instruction	n. 指示
+mine	n. 矿 pron. 我的（xx）东西
+dress	n. 服装 v. 穿着
+separate	adj. 分开的、不同的
+school	n. 学校、学派（比如印象派）	n.（鱼）群
+ring	n. 戒指、圈、环
+learn	v. 学习
+purple	n. 紫色
+daily	adj. 每天的
+movie	n. 电影
+celebrate	v. 庆祝
+text	n. 文本
+wheel	n. 轮子
+proper	adj. 适宜的
+mall	n. 商场
+health	n. 健康
+fix	v. 修理、固定
+chop	v. 砍、切
+poem	n. 诗歌
+sentence	n. 句子
+impress	v. 给……深刻印象
+habitat	n. 栖息地
+grade	n. 年级、分数	n. 级别 v. 给……评分、分级
+room	n. 房间、空间	n. 余地
+road	n. 路
+result	n.&v. 结果
+cause	v. 引起 n. 原因
+draw	v. 画、轻拉[drew - drawn]
+create	v. 创造
+wish	n. 愿望 v. 希望
+art	n. 艺术
+sweet	adj. 甜的
+donate	v. 捐赠
+advertisement	n. 宣传、广告
+rule	n. 规则、统治	v. 统治 n. 常规
+autumn	n. 秋天
+tour	n. 旅游
+rise	n.&v. 上升、崛起[rose - risen]
+term	n. 学期、术语
+single	adj. 单一的、单身的
+collect	v. 收集、聚集
+habit	n. 习惯
+calendar	n. 日历
+hold	v. 拿住、容纳、保持 [held - held]
+earthquake	n. 地震
+cash	n. 现金
+take	v. 拿、花费、采取、带[took - taken]
+poor	adj. 贫穷的、差的、可怜的
+mirror	n. 镜子
+government	n. 政府
+suffer	v. 遭受
+central	adj. 中心的
+yellow	n. 黄色
+tasty	adj. 美味的
+knowledge	n. 知识
+marriage	n. 婚姻
+wing	n. 翅膀
+operation	运行、操作
+coal	n. 煤
+regular	adj. 定期的、规则的
+polar	adj. (南、北）极的
+church	n. 教堂、教会
+subway	n. 地铁
+route	n. 路线
+landscape	n. 地貌、局面
+shape	n. 外形
+chance	n. 机会、可能性
+dead	adj. 死的
+doubt	n.&v. 怀疑
+master	n. 大师、师傅
+cheer	v. 欢呼
+taste	n. 味道、品味
+perfect	adj. 完美的
+circle	n. 圆圈
+medium	n. 媒介[pl. media]
+dangerous	adj. 危险的
+weak	adj. 弱的
+thing	n. 事情、东西
+experience	v.&n. 经历
+serve	v. 供应（餐饮）、服务
+fish	n. 鱼 v. 捕鱼
+rapid	adj. 快速的
+moment	n. 时刻
+ride	v.&n. 骑 [rode - ridden]	v. 在……上漂流、运载
+meaning	n. 意思
+journey	n. 行程
+ancient	adj. 古老的
+geography	n. 地理学
+park	n. 公园
+skate	v. 滑冰
+sure	adj. 确定的、可靠的
+expensive	adj. 昂贵的
+among	prep. 在……之间
+cry	v.&n. 哭、叫声
+carry	v. 携带、运送、（声音）传的远
+emergency	n. 紧急情况
+office	n. 办公室、公职
+wine	n. 葡萄酒
+spot	n. 地点
+guilty	adj. 有过错的
+fry	v. 炸
+transportation	n. 交通运输
+oak	n. 橡树
+stress	n. 压力、强调
+island	n. 岛
+novel	n. 小说 adj. 新奇的
+energy	n. 能量
+strict	adj. 严格的
+ready	adj. 准备好的、方便的
+reach	v. 到达、达到、达成	n. 可及的范围
+partner	n. 伙伴、合伙人
+tell	v. 讲述、判断[told - told]
+print	v. 印刷
+spell	v. 预示、拼写[spelled/spelt - spelled/spelt]	n. 一段（热/冷的）时期
+king	n. 国王
+notebook	n. 笔记本
+seat	n. 座位、席位、所在地
+test	n. 测试、考验
+creative	adj. 创造力的
+pass	v. 通过、传递、流逝
+balance	n.&v. 平衡
+time	n. 时间、时期、次数、倍数
+compare	v. 对比
+glad	adj. 高兴的
+crazy	adj. 疯狂的
+interview	v.&n. 面试、询问
+whole	adj. 完整的 n. 整体
+sea	n. 海洋
+use	n. 使用
+athlete	n. 运动员
+thick	adj. 厚的
+mouth	n. 嘴巴、（河、洞）口
+share	v. 分享、共有
+online	adj. 网上的
+importance	n. 重要性
+soccer	n. 足球
+fence	n. 栅栏 v. 圈起
+entertainment	n. 娱乐
+spotlight	n. 聚光灯
+attitude	n. 态度
+crowd	n. 群
+coat	n. 外套、外层
+interest	n. 兴趣、利益 v. （使）感兴趣（be interested in... 对……感兴趣）
+enter	v. 进入
+challenge	v. 挑战、质疑
+chemistry	n. 化学（成分）
+storm	n. 暴风雨
+show	v. 表明、展示[showed - shown] n. 表演
+treasure	n. 宝藏 v. 珍视
+basket	n. 篮子
+apple	n. 苹果
+mouse	n. 老鼠
+dark	adj. 黑暗的、暗色的
+excuse	v.&n. 原谅
+choose	v. 选择[chose - chosen]
+secret	adj. 秘密的
+evening	n. 晚上
+job	n. 工作
+lead	v. 导致[lead to sth 导致……] n. 铅[led - led]
+gift	n. 天赋、礼物
+add	v. 增加、添加
+luck	n. 运气
+talk	v.&n. 说话、谈话
+count	n. 数目 v. 数……数目
+rope	n. 绳子
+increase	v.&n. 增加
+follow	v. 跟随、在……之后发生	v. 听从、理解 [I can't follow you. 我没有理解你的话]
+prize	n. 奖品 v. 珍视
+accident	n. 偶然事件、意外事故
+garden	n. 花园
+countryside	n. 乡村
+firm	n. 公司 adj. 牢固的
+permission	n. 准许
+suitable	adj. 合适的
+heaven	n. 天堂
+beauty	n. 美
+specifically	adv. 专门地、更确切地说
+bulb	n. 灯泡、球茎
+scary	adj. 可怕的
+clap	v. 鼓掌
+vote	v.&n. 投票
+plastic	n.&adj. 塑料（的）
+sister	n. 姐妹
+record	v. & n. 记录、录制
+butter	n. 黄油
+hard	adj. 艰难的、硬的、努力的
+break	v. 打碎、分裂 [broke-broken]
+cotton	n. 棉花
+artist	n. 艺术家
+shoot	v.射击、拍摄[shot-shot]	n. 新芽
+doctor	n. 医生、博士
+convenient	adj. 方便的
+terrible	adj. 可怕的
+glass	n. 玻璃（制品）
+careful	adj. 仔细的
+diary	n. 日记
+shout	v. 大喊
+hunt	v.&n. 打猎
+fashion	n. 时尚、方式 [in a similar fashion 以相似的方式]
+punish	v. 惩罚
+bridge	n. 桥 v. 连接（两个东西）	v. 缩减（差异）
+radio	n. 无线广播
+insect	n. 昆虫
+banana	n. 香蕉
+never	adv. 从不
+volunteer	n. 志愿者
+smile	n. 笑
+camera	n. 照相机
+idea	n. 观点、想法
+advantage	n. 优势
+hill	n. 小山丘
+clothes	n. 衣服
+anything	n. 任何事、任何东西
+purpose	n. 目的
+boat	n. 船
+education	n. 教育
+order	n. 顺序、秩序、命令	v. 命令 n. 目、纲
+statement	n. 陈述、声明
+seal	n. 印章、海豹
+alright	adv. 好吧、就这样吧
+supply	v.&n. 供应
+district	n. 区
+reveal	v. 显示、揭露
+ink	n. 墨水
+discovery	n. 发现
+association	n. 联系	n. 协会
+southern	adj. 南的
+reduce	v. 减少、降低
+total	adj. 总的、完全的
+mention	v. 提到
+work	n. 工作[不可数]、作品
+cabbage	n. 卷心菜
+aware	adj. 意识到的 [be aware of sth 意识到sth]
+English	adj. 英国（人）的
+dialogue	n. 对话
+hear	v. 听[heard-heard]
+bill	n. 票据、(鸟)喙
+positive	adj. 积极的、阳性的
+grey	n.&adj. 灰色（的）
+tower	n. 塔
+dig	v. 挖掘 [dug-dug]
+death	n. 死亡
+safe	adj. 安全的、有把握的
+age	n. 年代、年龄	v. 变老 [aging n. 老龄化 adj. 老化的]
+straight	adj. （笔、径）直的
+onion	n. 洋葱
+afford	v. 买得起、承担的起	v. 提供 (The room affords a beautiful view over the city.)
+ground	n. 地（面、区）	n. 依据
+animal	n. 动物
+card	n. 卡片
+heart	n. 心脏
+breakfast	n. 早餐
+guide	v.&n. 指南、导向 n. 导游
+weekend	n. 周末
+practice	n.&v. 实践、练习、做法
+matter	n. 物质、事情
+full	adj. 完全的、充分的
+pressure	n. 压力
+diet	n. 饮食
+hurt	v. 伤害[hurt-hurt]
+project	n. 项目 v. 预测
+enemy	n. 敌人
+supermarket	n. 超市
+nature	n. 自然、本质
+list	n. 清单
+yet	conj. 然而、尚且、更
+author	n. 作者
+globe	n. 全球、球体
+soap	n. 肥皂
+fiction	n. 小说
+hide	v. 隐藏[hid-hidden] n. 兽皮
+quality	n. 质量	adj. 高品质的[ quality time/ products]
+grass	n. 草
+conversation	n. 对话
+flower	n. 花 v. 开花
+continue	v.（使）继续
+snow	n. 雪
+miss	v. 思念、错过、漏掉
+tap	v.轻敲 n. 水龙头	v. 开发、导出
+object	n. 物体 v.反对
+invite	v. 邀请
+mind	n. 思维、想法 v. 介意
+win	v. 赢（得） [won-won]
+president	n. 总统
+bell	n. 铃
+medicine	n. 药
+lift	v.&n. 举起（力）
+message	n. 信息
+repair	n.&v.修理
+god	n. 神
+run	v. 跑、运行、播放 [ran-run]
+ship	n. 船
+invent	v. 发明
+special	adj. 特别的、特殊的	adj. 特有的
+population	n. 人口、数量、种群
+condition	n. 状况
+sell	v. 卖[sold-sold]
+wolf	n. 狼[pl. wolves]
+offer	v.&n. 提供
+water	n. 水	v. 浇水
+accept	v. 接受、相信（观点）
+rice	n. 大米
+here	adv. 在这里
+rain	n. 雨水 v. 下雨
+pick	v. 拿、拾
+teach	v. 教[taught-taught]
+hope	n.&v. 希望
+history	n. 历史（学）
+furniture	n. 家具
+comedy	n. 喜剧
+expert	n. 专家
+duty	n. 职责、税
+building	n. 建筑物
+important	adj. 重要的
+model	n. 模型
+mistake	n. 错误 v.弄错[mistook-mistaken]
+instrument	n. 乐器、工具
+coach	n. 教练、马车
+call	v. 打电话、称作、（动物等）叫
+rainbow	n. 彩虹
+note	n.笔记 v. 指出
+doll	n. 玩具娃娃
+kill	v. 杀死
+discuss	v. 讨论
+peace	n. 和平
+good	adj. 好的、合适的、大量的
+toy	n. 玩具
+final	adj. 最后的
+winter	n. 冬天
+party	n. 聚会、政党	n. 群、一方（当事人）
+opinion	n. 看法
+guess	v.&n. 猜测
+pool	n. （水）池、一滩
+explore	v. 探索、勘探
+money	n. 钱
+protect	v. 保护
+build	v. 建造、培养[built-built]
+birth	n. 出身、生育	n. 起源
+swim	v. 游泳[swam-swum]
+praise	v.&n. 称赞
+farm	n. 农场 v. 耕种
+thirsty	adj. 口渴的
+culture	n. 文化、文明
+meal	n. 饭、食物
+silly	adj. 愚蠢的
+blind	adj. 盲的
+elementary	adj. 基本的、元素的
+talented	adj. 有天赋的
+mixture	n. 混合（物）
+stream	n. 溪流、（一）股（水流、电流）
+fold	v. 折叠	n. 褶皱
+insist	v. 坚持（认为）[insist on sth 坚持某事]
+prince	n. 王子
+try	v.&n. 尝试
+write	v. 书写 [wrote-written]
+hall	n. 大厅
+guard	v.&n.守卫
+consider	v. 考虑、认为
+foreign	adj. 外国的、外来的
+passenger	n. 乘客
+clean	adj. 干净的
+situation	n. 处境、情况
+look	v.&n. 看
+hour	n. 小时
+surface	n. 表面	v. 显现
+mountain	n. 山
+black	n.&adj. 黑色（的）
+found	v. 创建[这个是原型，变体是founded-founded]
+trust	n. 信任	n. 信托
+food	n. 食物
+cover	n.&v. 覆盖	v. 报道、掩护
+square	adj. 方形的、平方的 n. 广场
+girl	n. 姑娘
+force	v. 迫使 n. （武）力
+weather	n. 天气
+police	n. 警察
+kind	adj. 友好的 n. 种类
+feed	v. 喂养[fed-fed] [feed on sth 吃……]
+railway	n. 铁路
+different	adj. 不同的
+healthy	adj. 健康的
+windy	adj. 风大的
+cooperate	v. 合作
+costume	n. 戏服
+major	adj. 主要的 n. 专业
+legend	n. 传说
+agent	n. 动因、代理
+gallery	n. （艺术）馆、（走、画）廊
+regard	n.&v. 看待[regard A as B 把A看作B]	v. 注意、考虑
+confident	adj. 有信心的
+worldwide	adj. 世界范围的
+citizen	n. 公民
+search	v.&n. 寻找
+we	pron. 我们
+shut	v. 关上 [shut-shut]
+benefit	v.（使）受益n.好处
+sing	v. 唱、叫[sang-sung]
+mix	v. 混合 n. 混合（物）
+smell	n. 气味 v.闻到[smelt/smelled-smelt/smelled]
+live	v. 生活、居住 adj. 活着的、现场表演的
+likely	adj. 可能的 [be likely to do sth 可能做……]
+deaf	adj. 聋的
+sir	n. [S-] 爵士
+dry	adj. 干（旱、燥）的 v. （使）变干
+save	v. 救助、储蓄、节约
+baby	n. 婴儿
+responsible	adj. 负有责任的
+nation	n. 国家
+surprise	n. 惊讶
+mother	n. 母亲
+soft	adj. 软的、温和的
+computer	n. 电脑
+together	adv. 一起
+long	adj. 长的 v. 渴望[long for sth 渴望sth]
+dragon	n. 龙
+strange	adj. 奇怪的、陌生的
+decide	v. 决定、断定
+row	n. 排
+large	adj. 大的
+wrong	adj. 错误的
+film	n. 电影、胶片、薄膜
+safety	n. 安全
+lot	pron. 大量[a lot of... / lots of ...] n. 一小块地
+basic	adj. 基础的
+native	adj. 本土的
+original	adj. 起初的（=起源性的）、独创性的
+discussion	n. 讨论
+court	n. 球场	n. 法庭（人员）、王宫（人员）
+bow	n. 弓
+sauce	n. 酱
+fetch	v. 去取、卖得
+zebra	n. 斑马
+exhibition	n. 展示、展览会
+avenue	n. 街道
+conjunction	n. 联合
+tradition	n. 传统
+mean	v. 意味着、导致[meant-meant]	n. 平均值
+sign	n. 标志 v. 签字
+minute	adj. 细小的
+require	v. 要求、需要
+discover	v. 发现
+lightning	n. 闪电
+stage	n. 舞台、阶段
+student	n. 学生
+pay	v. （支）付 n. 薪水
+beach	n. 海滩
+believe	v. 认为、相信
+stick	n. 棍 v. 粘住[stick to sth 粘住sth][stuck-stuck]
+chore	n. 家务活、杂务
+hair	n. 头发、毛
+fork	n. 叉子
+land	n.（土、陆）地
+introduce	v. 引入、介绍
+lock	v. 锁（住）
+return	v.&n. 返回、送还、回报
+fan	n. 扇	v. 扇形展开
+popular	adj. 广受喜爱的、流行的、民众的
+gym	n. 健身房、体操
+rest	n.&v. 休息、停靠
+tiny	adj. 极小的
+complete	adj. 完成的、完全的
+hole	n. 洞
+earth	n. 地球、土地	n. 陆地、泥土
+later	adv. 后来
+wonderful	adj. 极好的
+therefore	adv. 因此
+eye	n. 眼睛
+moon	n. 月亮、卫星
+seldom	adv. 很少
+guitar	n. 吉他
+worker	n. 工人、工蜂
+player	n. 选手
+popularity	n. 流行
+realistic	adj. 现实的、务实的
+wheat	n. 小麦
+prevent	v. 阻止
+seek	v. 寻求[sought-sought]
+misleading	adj. 误导的
+aggressive	adj. 攻击性的
+forbid	v. 禁止[forbade-forbidden]
+crowded	adj. 拥挤的
+stomach	n. 胃
+burn	v.（使）燃烧
+perform	v. 做、表演
+trade	n. 贸易
+drama	n. 戏剧（性场面）
+power	n. 能量、权力	n. 能力、强国
+train	n. 火车 v. 训练
+focus	n.&v. 关注
+compete	v. 竞争
+uniform	adj. 一致的、同样的
+describe	v. 描述
+sad	adj. 悲伤的
+careless	adj. 粗心的
+cheese	n. 奶酪
+satisfy	v. 满足
+free	adj. 自由的、空的 [free of sth 没有……的]
+read	v. 读 [read-read]
+left	n.&adj. 左侧（的） v. leave 的过去式
+say	v. 说、宣称、例如[said-said]
+book	n. 书、账簿 v. 预定
+bored	adj. 无聊的
+outgoing	adj. 往外去的
+cookie	n. 小甜饼干
+kick	v. 踢
+era	n. 时代
+raise	v. 使变高（提升、增加）、饲养、种植
+useful	adj. 有用的
+competition	n. 竞争
+elevator	n. 电梯
+mysterious	adj. 神秘的
+climate	n. 气候
+magic	n. 魔法
+lay	v. 下蛋、奠定（基础等）[laid-laid]
+friend	n. 朋友
+case	n. 情况、案例
+recommend	v. 建议
+heavy	adj. 重的、强烈的
+easy	adj. 容易的、舒适的
+dictionary	n. 字典
+meeting	n. 会议
+salad	n. 沙拉
+survey	n.&v. 调查
+appear	v. 出现、看起来[appear to]
+possible	adj. 可能的
+wash	v. &n. 洗涤、冲洗
+aid	v.&n. 协助
+science	n. 科学
+gun	n. 枪
+research	n.&v. 研究
+farmer	n. 农民
+prepare	v. 准备
+hero	n. 英雄
+remind	v. 使想起[remind sb of sth 提醒sb sth]
+corner	n. 角落
+recycle	v. 再循环（利用）
+trip	n. 旅行
+background	n. 背景
+night	n. 晚上
+lab	n. 实验室
+screen	n. 屏幕
+dirty	adj. 脏的
+average	n. 平均（值） adj. 平均的
+level	n. 水平
+poet	n. 诗人
+welcome	n.&v. 欢迎
+hungry	adj. 饥饿的
+social	adj. 社会的、社交的
+smoke	n. 烟 v. 抽烟
+customer	n. 消费者
+combine	v.（使）结合
+waiter	n. 男服务员
+chase	v. 追赶
+sink	n. 水槽 v. 下沉、沉没 [sank-sunk]
+disadvantage	n. 劣势
+assistant	n. 助理
+zigzag	n.&v. 之子形（移动）
+treatment	n. 处理、治疗
+airplane	n. 飞机
+super	adj. 超级的
+telephone	n. 电话
+surf	n. 拍岸大浪
+vocabulary	n. 词汇
+writer	n. 作家
+escape	v. 逃脱
+ocean	n. 海洋
+wonder	n. 惊奇 v. 想知道
+electric	adj. 电的
+tie	n. 领带 v. 联系
+rocket	n. 火箭
+real	adj. 真实的、逼真的
+speak	v. 说[spoke-spoken]
+begin	v. 开始[began-begun]
+slim	adj. 苗条的、微小的
+ice	n. 冰
+plan	v.&n. 计划
+height	n. 高度、顶点
+festival	n. 节日
+clear	adj. 清楚的、晴朗的、开阔的
+home	n. 家、家乡、发源地
+century	n. 世纪
+difficult	adj. 困难的
+behave	v. 行为表现
+medical	adj. 医学的
+common	adj. 常见的、共有的
+anyone	n. 任何人
+enough	adv.&adj. 足够（的）
+shock	n. 冲击 v. （使）震惊
+disease	n. 疾病
+last	adj. 上一个、最后的 v. 持续	adj. 刚刚过去的
+drink	v.&n. 饮用 [drank-drunk]
+hug	v. 紧靠着
+number	n. 数量 [ a number of ... 大量的；the number of ... ……的数量]
+progress	n. 进展、进化
+town	n. 城镇
+light	n. 光（线） adj. 轻的
+yard	n. 院子
+appointment	n. 约会
+symphony	n. 交响乐
+announce	v. 宣布
+chest	n. 胸部
+gentle	adj. 温和的
+injure	v. 伤害
+establish	v. 建立、证实
+rank	n. 级别
+stair	n. 楼梯
+serious	adj. 严重的、严肃的
+illness	n. 疾病
+control	v. 控制
+really	adv. 真实地
+report	n.&v. 告知、报告
+loud	adj. 大声的
+gate	n. 大门
+courage	n. 勇气
+warm	adj. 温暖的 v. （使）变暖
+orange	n. 橙（的）
+pack	n. 群 v. 包装
+middle	n.&adj. 中间（的）
+awake	adj. 醒着的
+street	n. 街道
+pocket	n. 小块地区、口袋
+tall	adj. 高的
+team	n. 团队
+country	n. 国家、乡村
+belt	n. 皮带、带状物
+pull	n.&v. 拉（力）
+role	n. 角色、作用
+express	v. 表达
+sweep	v. 吹、清扫[swept-swept]	v. 冲、迅速移动
+busy	adj. 繁忙的
+steal	v. 偷[stole-stolen]
+tidy	v. 整理 adj. 整洁的
+attend	v. 参加
+exactly	adv. 精确地
+action	n. 行动	n. 活动、情节
+corn	n.玉米、谷物
+dozen	n. 十二
+musician	n. 音乐家
+twin	n. 双胞胎（之一）
+underwater	adv. & adj. 水下（的）
+prediction	n. 预言
+feature	n. 特征
+penny	n. 便士 （英国货币单位，100便士等于1英镑）
+anxious	adj. 焦虑的
+understand	v. 理解 [understood-understood]
+adult	n. 成年（人、动物）
+wake	v. 醒来 [woke-woken]
+fair	adj. 公平的 n. 集市	adj. 相当大的、晴朗的
+ball	n. 球
+thin	adj. 薄的、细的
+brain	n. 脑
+match	v.&n. 相匹配（的人或物）
+side	n. 侧、面、边、一方的观点
+opera	n. 歌剧
+bit	n. 一点儿
+lake	n. 湖
+round	adj. 圆的	n. （一）轮、（比赛等的）回合
+choice	n. 选择
+quarter	n. 四分之一	n. 地区
+anyway	adv. 不管怎样
+host	n. 宿主
+ability	n. 能力
+unit	n. 单位	n. （部队、医院、警察等整体的一个）分队
+modern	adj. 现代的
+neck	n. 脖子
+wave	n. 波（浪）
+cheap	adj. 便宜的、廉价的
+paper	n. 纸
+fat	n. 脂肪 adj. 胖的
+encourage	v. 鼓励、促使
+touch	n.&v. 触摸
+spring	n. 春天、泉水	n.弹簧 v. 涌出 [spring up] [sprang-sprung]
+plenty	n. 丰富
+concert	n. 音乐会
+mobile	adj. 移动的
+shiny	adj. 闪亮的
+rural	adj. 乡村的
+tense	v.（使）绷紧
+sight	n. 视野、景象
+flight	n. 飞行
+recipe	n. 食谱
+battery	n. 电池
+pollution	n. 污染
+envelope	v.&n. 包裹（物）
+blank	adj. 空白的 n. 空白
+respect	n.&v. 尊重
+factory	n. 工厂
+classroom	n. 教室
+classmate	n. 同班同学
+director	n. 导演
+patient	adj. 耐心的 n. 病人
+palace	n. 宫殿
+paint	n. 颜料 v. 绘画
+smooth	adj. 光滑的
+excited	adj. 兴奋的
+vacation	n. 假期 v. 度假
+butterfly	n. 蝴蝶
+till	conj. 直到……为止 v. 耕种
+weigh	v. 称（重）
+website	n. 网站
+brush	n. 刷子 v. 刷
+goal	n. 目标
+bedroom	n. 卧室
+advise	v. 建议
+pollute	v. 污染
+interesting	adj. 有趣的
+relationship	n. 关系
+community	n. 群（体、落）
+bean	n. 豆
+feeling	n. 感觉、感情
+technology	n. 技术
+boring	adj. 令人无聊的
+pale	adj. 浅色的、苍白的
+officer	n. 官员
+cartoon	n. 卡通
+personal	adj. 个人的
+swing	n. 秋千 v.&n. 摇摆
+clerk	n. 接待员
+solution	n. 解决方法、溶液
+hunger	n. 饥饿
+creature	n. (尤其是不明的或想象中的）生物
+custom	n. 风俗习惯
+scientific	adj. 科学的
+experiment	n.&v.（做）实验
+`,
+  "基础词汇": `fossil	n.化石
+process	n.过程 v.处理
+mass	n.大（团）、质量	n. 大（堆、块等）、体积
+indicate	v.表明、暗示
+effect	n.影响
+cause	v.引起 n.原因
+present	v.呈现 adj. 当前的、在场的	v. 展示、带来 n.礼物
+occur	v.出现	发生
+essential	adj.至关重要的
+trade	n.贸易、手艺 v.交易
+artist	n.艺术家
+common	adj.常见的、共有的
+remain	v.保持、继续	v. 停留
+record	v&n .记录、录制
+size	n.大小、规模
+space	n.空间、太空	n.&v. 间隔
+glacier	n.冰川
+particular	adj.特定的
+complete	adj.完成的、完全的	adj. 完整的、彻底的
+amount	n.数量
+influence	n&v .影响
+climate	n.气候
+paint	n.颜料 v 绘画
+community	n.群（体、落）
+ancient	adj.古老的	adj. 古代的
+organism	n.有机体、（微）生物
+technique	n.方法、技能
+base	n.基础 v 以……为基础
+individual	n&adj.个体（的）
+major	adj.主要的 n.专业 v.以...为专业
+film	n.电影、胶片、薄膜 v.拍摄成影片
+continue	v.（使）继续
+energy	n.能量
+involve	v.涉及
+rate	n.（比、速）率
+highlight	v.强调、加高亮
+likely	adj&adv.可能的
+nest	n.巢 v.筑巢
+add	v.增加	v. 添加
+object	n.物体 v.反对
+force	v.迫使 n.（武）力
+crop	n.庄稼
+pattern	n.模式、图案
+desert	n.沙漠 v.抛弃
+direction	n.方向、说明
+behavior	n.行为
+tool	n.工具
+impact	n&v.影响、撞击
+variety	n.种类
+sediment	n.沉淀物
+factor	n.因素、倍数
+supply	n&v.供应
+urban	adj.城市的
+limit	v.限制 n 界限	n 限制、极限
+exist	v.存在
+economy	n.经济（体制）
+cave	n.洞穴
+iron	n.铁
+determine	v.决定、确定
+pressure	n.压力
+research	n&v.研究
+emotion	n.感情
+relatively	adv.相对地
+significant	adj.重大的、重要的
+public	adj.公众的 n.公众	adj. 公开的 n.大众
+demand	v&n.需要、需求
+local	adj.当地的、地方的
+various	adj.各种不同的
+rise	v&n.上升、崛起
+characteristic	n.特征
+culture	n.文化、文明
+infant	n.婴儿
+recent	adj.最近的
+site	n.场所、地点
+property	n.（物质、物体的）特性、财产
+atmosphere	n.大气
+reduce	v.减少、降低
+deposit	n.沉积物 v.沉积
+statement	n.陈述声明
+settle	v.解决、定居、确定
+melt	v.（使）融化、熔化
+Pacific	adj.太平洋（的）
+available	adj.可获得的、可用的	adj. 空的
+direct	adj.直接的 v.引导
+industry	n.行业、工业
+vary	v.改变、相异
+range	n.范围、山脉 v.（在一定范围内）变化	n. 大牧场
+subject	n.主题 v.使遭受	n. 实验对象、国民
+role	n.作用、角色
+establish	v.建立、证实
+tend	v.倾向于、照顾
+compare	v.对比
+insect	n.昆虫
+replace	v.代替
+attract	v.吸引
+clay	n.黏土
+marine	adj.海洋的
+current	adj.当前的 n.（洋、电、水）流
+improve	v.改进、提高
+value	n.价值、（数）值
+raise	v.使变高（提升、增加）、饲养、种植、提出（问题等）	v. 筹集
+maintain	v.保持、坚持认为
+ant	n.蚂蚁
+periodic	adj.周期的、定期的
+metal	n.金属
+native	adj.本土的
+identify	v.识别、发现
+valley	n.（山、河）谷
+specific	adj.特定的、明确的
+origin	n.起源
+grain	n.谷物、颗粒
+primary	adj.主要的、最初的	adj. 原始的
+mammal	n.哺乳动物
+formation	n.形成、地层
+complex	adj.复杂的 n. 复合体
+steam	n.蒸汽
+agriculture	n.农业
+particle	n.颗粒
+aspect	n.方面
+experiment	n&v.（做）实验
+instrument	n.工具、手段、乐器
+therefore	adv.因此
+tradition	n.传统
+represent	v.代表、描绘
+iceberg	n.冰山
+store	v.储存
+depend	v.依赖
+general	adj.普遍的、大体的	adj. 整体的
+contrast	n.对比、差别
+predator	n.捕食者
+against	prep.与……相反、违背	prep. 对比、以...为背景
+survive	v.存活、挺过	v. 比……活的长
+nature	n.自然、本质
+solar	adj.太阳的
+architecture	n.建筑
+primarily	adv.主要地
+observe	v.观察（到）	v. 遵从（法律等）
+canal	n.运河
+craft	n.手艺
+reflect	v.反映、反射、反思
+argue	v.论证
+draw	v.[drew-drawn]画、得出 [draw a conclusion]、轻拉
+theater	n.剧院、戏剧表演
+especially	adv.特别是、尤其
+aggressive	adj.攻击性的
+extreme	adj&n.极端、极大（的）
+sense	n.意识
+single	adj.单一的、单身的	v.选中（single out sth 把sth挑出来）
+previous	adj.先前的
+obtain	v.获得
+recognize	v.识别、意识到	v. 承认、赏识
+hypothesis	n.假设
+rural	adj.乡村的
+substance	n.物质
+channel	n.水道、通道
+construction	n.建造（物）
+internal	adj.内部的
+crystal	n.结晶体
+rapid	adj.快速的
+quantity	n.数量
+illustrate	v.说明、加插图
+remove	v.移除
+typical	adj.典型性的
+resource	n.资源
+migration	n.迁徙
+merchant	n.商人
+coast	n.海岸
+claim	v&n.声称、夺取
+plate	n.（地质）板块、盘子、板（状物）
+mark	v&n.标志、标记	n. 目标
+entire	adj.整个的、全部的
+plain	n.平原 adj.平的
+extend	v.延伸
+core	n.中心、（地）核
+constant	adj.恒定不变的 n.常数	adj. 持续不断的
+adult	n.成年（人、动物）
+figure	n.图形、人像 [v. figure sth out 弄清楚sth]	n.数字v.弄懂、突出 Socialissuesfiguredprominentlyinthetalks.社会问题在这些演讲中明显突出出来
+unlike	prep.不像
+expand	v.扩大	v. 使……发展
+engine	n.引擎
+stimulus	n.刺激（物）
+landscape	n.地貌、局面
+associate	v.联系 n.小伙伴
+rare	adj.罕见的
+minor	adj.较小的	adj. 较少的
+artisan	n.手工艺者
+meteorite	n.陨石
+oxygen	n.氧气
+erosion	n.侵蚀
+response	n.回应
+decade	n.十年
+preserve	v.保存、保护
+labor	n.劳动、劳工
+revolution	n.革命
+positive	adj.积极的、阳性的
+route	n.路线
+statue	n.雕像
+jupiter	n.木星
+organic	adj.有机的
+apparent	adj.明显的、表面看起来的
+motion	n.运动
+composition	n.组成、作品
+stage	n.阶段、舞台
+vegetation	n.植被
+eventually	adv.最终
+expose	v.使暴露
+project	v.预测 n. 项目	v. 投影、（从一个平面）凸出来
+liquid	n&adj.液体（的）
+differ	v.不同
+spread	n&v.扩散
+encourage	v.鼓励、促使
+data	n.数据
+coal	n.煤
+combine	v.（使）结合
+cretaceous	adj.白垩纪的
+terrestrial	adj.陆地的、类地的
+leaf	n.叶子（复数 leaves）
+sequence	n.顺序、数列
+estimate	v&n.估计
+drill	v&n.钻（孔）	v.&n. （重复性）训练
+transport	v.运输
+groundwater	n.地下水
+serve	v.v. 供应（餐饮）、服务、发挥作用 [serve as ... ]、服役	v. 为……效力
+favor	n&v.喜爱、支持
+root	n.根、根源
+huge	adj.巨大的
+exchange	n&v .交换
+ecosystem	n.生态系统
+distance	n.距离
+assume	v.假定	v. 担任、采用
+principle	n.原则、原理
+cause	v.引起 n.原因
+sculpture	n.雕塑
+presence	n.存在	n. 到场
+accumulate	v.聚积
+colony	n.居住在一起的群体、殖民地	n. 聚集区
+gradual	adj.逐渐的
+solid	adj.固体的	adj. 坚固的、可靠的
+service	n.服务	n. 服役、公共服务机构
+destroy	v.摧毁
+potential	adj.潜在的 n.潜能
+sign	n.标志 v.签字	n. 迹象、字符 v. 签约
+electricity	n.电
+situation	n.处境、情况
+evolution	n.进化
+fill	v.填满	v. 打发（时间）[fill one's day]
+content	n.含量 adj.满意的	n. 内容、满足
+signal	n.信号 v.表明	v. 发信号（传递信息）
+generation	n.代、生产
+vast	adj.巨大的
+manufacture	v&n.生产
+compete	v.竞争
+commercial	adj.商业的 n.（电视/电台）广告
+approach	n.方法 v.接近
+predict	v.预言、预示
+release	v&n.释放
+sample	n.样本
+extensive	adj.广泛的
+reveal	v.显示、揭露
+regular	adj.定期的	adj. 有规律的、经常的、规则的
+effort	n.努力
+irrigation	n.灌溉
+attempt	v&n.试图、努力
+serious	adj.严重的、严肃的
+adapt	v.适应
+distinguish	v.区分
+decrease	v&n.（使）下降
+negative	adj.负面的、阴性的
+vessel	n.器皿、（脉、血）管	n. 船只
+galaxy	n.银河系
+focus	n&v.关注
+aquifer	n.蓄水层
+drift	n&v.漂流（物）、偏移
+wire	n.电线	v. 给……装电线
+decline	v&n.下降
+immediate	adj.立即的	adj. 紧急的、紧邻的
+crater	n.陨石坑
+strike	v&n.袭击、罢工
+feed	v.喂养
+master	n.大师	n. 控制者、师傅
+emerge	v.出现
+import	v&n.进口
+muscle	n.肌肉
+organize	v.组织、整理
+desire	n.愿望
+bear	n.熊 v. 生（孩子）[bore-born]、忍受	v.长（种）、承担、（具）有
+character	n.特征、角色	n. 人物、书写符号、人品
+breathe	v.呼吸
+solution	n.解决方法、溶液
+era	n.时代
+climax	n.最高点
+standard	n.标准 adj.标准的
+shift	v.转换	n.轮班 [ night shift 夜班]
+considerable	adj.相当大的、显著的
+isolate	v.（使）孤立、隔离
+settlement	n.定居点、协议
+wealth	n.财富
+achieve	v.获取
+continuous	adj.持续的
+stratum	n.层（复数strata）
+arrange	v.安排
+promote	v.促进
+inhabitant	n.居民
+Mediterranean	n.地中海
+fungus	n.真菌（复数fungi）
+pot	n.罐
+slight	adj.轻微的
+depth	n.深度
+visible	adj.可见的
+belief	n.观念、信念
+skeleton	n.骨架
+absorb	v.吸取
+advertise	v.宣传、做广告
+host	n.宿主 v.主办
+enable	v.使能够
+basin	n.盆地
+gather	v.（使）聚集
+note	n.笔记 v. 注意	v. 指出
+flood	n.洪水 v.淹没	v. 涌入
+shell	n.壳
+section	n.部分
+device	n.设备、手段
+transform	v.（使）改变
+band	n.群体、带（状）	n. 范围、乐队
+sufficient	adj.充足的
+dust	n.灰尘
+attitude	n.态度
+approximate	adj.大概的	adj. 接近的、相似的
+fuel	n.燃料
+visual	adj.视觉的
+dye	v.染色 n.染料
+share	v.分享 n. 份额	共有[share the same interest]、赞同[share sb's opinion] n. 股份
+hide	v.隐藏、n. 兽皮
+practical	adj.实（用、践、际）的
+rhythm	n.节奏
+ritual	n.典礼 adj.仪式的
+lightning	n.闪电
+account	n.账目、记录	n. 描述
+block	n.块 v.阻挡	n. 楼 [a white-painted apartment block 一栋白色的公寓楼]
+invention	n.发明
+extinct	adj.灭绝的
+carve	v.切、刻
+continental	adj.大陆的
+explosion	n.爆炸	n. 暴涨、突然爆发
+flight	n.飞行、（从危险/不开心的情况中）逃走
+tissue	n.组织、纸巾
+cotton	n.棉花
+crust	n.地壳、硬外壳
+trace	v.追踪 n. 痕迹[a trace of sth/ traces of sth 少许]	v. 勾画（轮廓等）
+fiber	n.纤维
+dense	adj.密集的、密度大的
+accurate	adj.精确的
+increasingly	adv.日益增加地
+spot	n.地点 v.看见[= notice]	n. 斑点
+length	n.长度
+tropical	adj.热带的
+efficient	adj.高效的
+nutrient	n.营养物
+pastoralist	n.畜牧者
+boundary	n.界限
+steel	n.钢
+tension	n.紧张、张力
+performance	n.表演、表现	n. 性能
+audience	n.观众
+conflict	n&v .冲突
+freeze	v.（使）结冰、冻结
+musical	adj.音乐的
+microscope	n.显微镜
+appeal	n.吸引力 v. 吸引 [appeal to sth 呼吁；求助于]
+cue	n&v .暗示
+atom	n.原子
+civilization	n.文明
+shelter	n.遮蔽处	v. 躲避、为…提供藏身处(或遮蔽处等)
+gain	v.获得、增加
+ceramic	adj.陶瓷的
+moral	adj.道德的
+stable	adj.稳定的
+lichen	n.地衣
+stem	n.茎
+habitat	n.栖息地
+unique	adj.独特的
+consequence	n.结果
+tribe	n.部落
+appropriate	adj.适当的
+external	adj.外部的
+proportion	n.比例
+concept	n.概念、观念
+resemble	v.与……相似
+scale	n.规模、鳞片
+intense	adj.（剧、激、强）烈的
+dominate	v.（处于）支配（地位）
+wild	adj.野的
+permit	v.使有可能、允许
+capable	adj.有能力的
+professional	adj.职业的、专业的
+virtually	adv.事实上、几乎
+diet	n.饮食
+phenomenon	n.现象
+permanent	adj.永久的
+column	n.列、柱状物
+minute	n.分钟 adj.细小的
+compound	n.混合物
+initial	adj.最初的
+evaporate	v.蒸发
+nucleus	n.核心
+despite	prep.尽管
+independent	adj.独立的
+divide	v.（使）分开
+prey	n.猎物 v.捕食
+expect	v.预料、期待
+creature	n.生物
+innovation	n.创新
+depression	n.低洼、萧条
+acquire	v.获得
+association	n.联系、协会	n. 联想
+abundant	adj.大量的
+contemporary	n.同时期的人／物
+adopt	v.采用、领养
+petroleum	n.石油
+demonstrate	v.证明、展示
+crack	v&n.破裂
+dissolve	v.溶解
+moisture	n.潮湿
+vapor	n.蒸汽
+equipment	n.装备
+succession	n.接替	n. 演替、继任、串[a succession of sth]
+annual	adj.年度的
+cattle	n.牛
+comet	n.彗星
+depict	v.描绘
+prior	adj.事先的、优先的
+fantasy	n.幻想
+employ	v.使用、雇佣
+immigrant	n.（外来）移民
+pump	n&v.泵
+fresh	adj.新鲜的
+suitable	adj.合适的
+cultivate	v.种植
+tie	v&n.联系
+derive	v.获得
+retain	v.保留
+civil	adj.公民的
+prehistoric	adj.史前时期
+numerous	adj.许多的
+complicate	v.使复杂
+frontier	n.边界
+distinct	adj.不同的、清楚的
+responsible	adj.负有责任的
+parasite	n.寄生虫
+modify	v.改变
+tone	n.语气	n. 氛围、色调、音
+propose	v.提出
+reaction	n.反应
+molecule	n.分子
+readily	adv.容易地[=easily]、迅速地
+mix	n.混合（物） v.混合
+document	v&n.记录、（用文件）证明
+ancestor	n.祖先
+scholar	n.学者
+access	n.使用权 v.获得
+raw	adj.未加工的
+mechanism	n.机制
+textile	n.纺织
+citizen	n.公民
+interaction	n.相互作用
+analyze	v.分析
+expedition	n.远征（队）
+conduct	v.实施、传导
+principal	adj.最重要的 n.校长
+seek	v.寻求
+surge	n&v .剧增、涌动
+availability	n.可用性、可得性
+sophisticated	adj.复杂的、高级的
+universe	n.宇宙
+impulse	n.冲动、脉冲
+debris	n.碎片
+texture	n.纹理、结构
+remarkable	adj.不同寻常的
+enormous	adj.（程度、范围、体积、数量等）极大的
+formal	adj.正式的、形式的
+perspective	n.观点	n. 透视画法
+plankton	n.浮游生物
+reproduce	v.繁殖
+frame	n.框架
+distinction	n.不同
+ideal	adj.理想的
+exact	adj.精确的
+flat	adj.平的 n.低洼地
+furthermore	adv.此外
+beach	n.海滩
+technical	adj.技术的、专业的
+artificial	adj.人工的
+precede	v.在……之前
+instance	n.例子
+decay	n&v.腐烂
+fundamental	adj.基本的、根本的
+height	n.高度、顶点
+asteroid	n.小行星
+export	n&v.出口
+flash	v&n.闪现、闪光
+secondary	adj.次要的
+pottery	n.陶器
+occupy	v.占（用、据、领）
+harvest	n.收割
+conclusion	n.结论
+restrict	v.限制
+stretch	v.（使）延伸 n. （河流、道路等的）分支
+requirement	n.要求
+operate	v.运行、操作
+trap	v.捕捉 n.陷阱
+reject	v.拒绝
+majority	n.多数
+volume	n.（音、容）量、（体）积	n. 卷 [a 24-volume book 一套24卷的书]
+float	v.漂浮
+zone	n.区域
+frequency	n.频率
+extent	n.程度、范围
+enhance	v.提高
+accompany	v.伴随
+interpret	v.解释、理解
+storm	n.暴风雨
+critical	adj.关键的、批判性的	adj. 危急的
+elite	n.精英
+branch	n.树枝、（树、机构等的）分支
+health	n.健康
+decorate	v.装饰
+portion	n.部分
+active	adj.活跃的	adj. 活动的、起作用的
+pure	adj.纯（粹）的、完全的
+engage	v.从事[engage in sth 参与sth]	v. 吸引、加入
+regulate	v.控制、调整
+critic	n.评论家
+balance	n.平衡
+pollution	n.污染
+drought	n.干旱
+survey	n&v.调查
+repeat	v.重复
+status	n.地位、状况	n. 重要性
+authority	n.权威
+perception	n.感知
+ridge	n.脊、隆起（ = 凸起的部分）
+stress	n.压力、强调
+context	n.背景
+millennium	n.千年
+favorable	adj.有利的（=beneficial)、更优的
+broad	adj.宽广的	adj. 广泛的、宽泛的
+risk	n.风险
+absence	n.不存在
+representative	n.代表 adj.代表性的
+defense	n.防御
+category	n.种类
+abandon	v.抛弃
+relation	n.关系、亲属
+exhibition	n.展示、展览会
+alter	v.改变
+myth	n.神话
+arid	adj.干旱的
+dramatic	adj.剧烈的、显著的	adj. 突然的
+arise	v.出现、由……产生
+reverse	v.逆转、使(决定、政策、趋势)转向
+capacity	n.能力、容量	n. 负载量、产量
+wooden	adj.木制的
+portray	v.描绘
+stick	n.棍 v.粘住[stick to sth 占到sth上去]	v. 戳穿、卡住(常用stuck） stick out sth 从sth里面戳出来
+transfer	v.转移
+arch	n.拱形结构
+distinctive	adj.与众不同的、有特色的
+tail	n.尾巴
+toxic	adj.有毒的
+magnetic	adj.有磁性的
+apart	adv.分开地
+herbivore	n.食草动物
+drain	v.流走、排干
+realize	v.意识到、变成现实
+shallow	adj.浅的
+surplus	n.过剩
+explore	v.探索、勘探
+classify	v.把……分类
+novel	n.小说 adj.新奇的
+collision	n.碰撞
+lung	n.肺
+diverse	adj.各种各样的、不同的
+temperate	adj.（气候或地区)）温和的
+widespread	adj.广泛的
+detect	v.察觉
+nevertheless	adv.然而
+wheat	n.小麦
+peak	adj.最高值的 n.巅峰
+navigate	v.导航（=沿着特定的方向行驶/飞/走过去）、航行于	v. 驾驶
+flourish	v.繁荣
+communicate	v.交流、传达
+distribute	v.分（散、布）	v. 分（发、开、类）
+mill	n.工厂、磨坊
+indirect	adj.间接的
+destruction	n.毁灭
+customer	n.消费者
+multiple	adj.多个的	adj. 多（种、次）的
+vitamin	n.维生素
+manner	n.方式、举止
+barrier	n.障碍、屏障
+mud	n.泥
+wheel	n.轮子
+rough	adj.粗糙的、大致的	adj. 风浪大的
+corridor	n.走廊
+fragment	n.碎片
+occasionally	adv.偶尔地
+ceremony	n.仪式
+altitude	n.海拔高度
+exploit	v.利用、开发利用
+schedule	n.计划安排
+aim	n.目标 v.瞄准
+consume	v.消耗	v. 吃掉、毁掉
+examine	v.仔细检查	v. 观察、考试
+province	n.省
+encode	v.编码
+random	adj.随机的
+pebble	n.卵石
+obvious	adj.明显的
+station	n.站
+archaeology	n.考古学
+dweller	n.居住者
+possess	v.拥有
+assemble	v.聚集
+definition	n.定义、阐述
+regional	adj.区域性的
+border	n.边界
+household	n.家庭
+trend	n.趋势
+suck	v.吮吸
+crisis	n.危机
+literary	adj.文学的、书面的
+pioneer	n.先锋、倡导者
+criticize	v.批评
+salinity	n.盐度
+shrub	n.灌木丛
+corn	n.玉米、谷物
+dynasty	n.朝代
+livestock	n.家畜
+drama	n.戏剧（性场面）
+extra	adj.额外的
+algae	n.水藻［复］
+round	n.（一）轮 adj.圆的	n. （比赛等的）回合
+imagine	v.想像
+selection	n.选择
+recover	v.恢复、找回
+expense	n.花费
+smooth	adj.光滑的
+scheme	n.方案
+anthropologist	n.人类学家
+discipline	n.学科、纪律	n. 方法
+opposite	adj.相反的 n.对立面	adj. 对面的
+interval	n.间隔
+volcano	n.火山
+steady	adj.稳定的
+universal	adj.普遍的、通用的
+terrain	n.地形
+fluid	n.液体
+museum	n.博物馆
+thereby	adv.由此
+copy	v.复制、模仿
+lens	n.镜头
+track	n.铁轨、一首乐曲
+porcelain	n.瓷
+spectrum	n.范围、光谱
+assign	v.分配
+giant	adj.巨大的
+superior	adj.优越的
+sheet	n.张、层
+rigid	adj.僵硬的、过于严格的
+symbol	n.象征（物）、符号
+functional	adj.实用的、起作用的
+domestic	adj.驯养的、国内的、家用的
+emphasis	n.强调
+colonize	v.殖民、移生
+acid	n.酸
+paleontologist	n.古生物学家
+apprentice	n.学徒
+justify	v.证明……有理
+cereal	n.谷类植物
+investigation	n.调查
+ore	n.矿石
+precise	adj.精准的
+consistent	adj.一致的	adj. 稳定的
+homeland	n.家园
+transition	n.转变
+psychological	adj.心理学的
+venus	n.金星
+aid	v&n.协助
+skull	n.头颅
+handle	v.处理 n. 把手	v. 拿
+profit	n.好处
+revise	v.修改
+fracture	n.断裂
+rent	n.租金、出租
+overcome	v.克服
+dam	n.水坝
+preference	n.偏爱
+calculate	v.计算
+canopy	n.树冠
+dig	v.挖掘
+reservoir	n.水库、储备
+description	n.描述
+pore	n.（细、毛、气）孔
+cast	v.铸造、投射
+circumstance	n.情形
+severe	adj.严重的、剧烈的
+string	n.串
+extract	v.提取
+compact	adj.紧密的、小巧的
+undergo	v.经历
+fragile	adj.脆弱的
+exaggerate	v.夸张
+demonstrate	v.证明、展示
+output	n.产出（量）
+skyscraper	n.摩天楼
+disease	n.疾病
+resist	v.抵抗
+fluctuation	n.波动
+breed	v.（使）繁殖
+argument	n.论点
+solve	v.解决
+cage	n.笼子
+productivity	n.生产率
+systematic	adj.系统的
+attribute	v.把……归因于 n.属性
+variable	adj.多变的 n.变量
+preservation	n.保存、保护
+initiate	v.开始
+perceive	v.感知、认为
+convince	v.说服
+clue	n.线索
+count	n.数目 v.数……数目	v. 有重要意义 Your opinion counts. 你的意见很重要。
+adjust	v.调整
+eliminate	v.根除
+resident	n.居民 adj.居住的
+vent	v.发泄、排放
+pole	n.（南、北）级	n. 柱、杆
+loose	adj.松的
+linguistic	adj.语言（学）的
+primitive	adj.原始的
+uniform	adj.一致的、同样的 n.制服
+vision	n.视觉、视野
+graze	v.吃（草）、放牧
+exception	n.例外
+elaborate	adj.精心设计的、复杂的、详尽的
+failure	n.失败、倒闭
+secure	adj.可靠的
+pool	n.（水）池、一滩
+mystery	n.谜团
+mature	v.成熟 adj.成熟的
+sustain	v.维持、支撑、遭受
+latitude	n.纬度
+organ	n.器官、琴
+earthenware	n.陶器
+refuse	v.拒绝
+hill	n.小山丘
+rite	n.传统仪式
+inhabit	v.居住
+govern	v.控制
+philosophy	n.哲学
+endure	v.承受、经得住
+offspring	n.后代
+brick	n.砖
+convert	v.转变
+celebrity	n.名人
+devise	v.设计
+territory	n.领土
+bond	v&n.（使）结合
+cluster	n.群 v.结成群
+vital	adj.至关重要的
+chemistry	n.化学（成分）
+oppose	v.反对
+portrait	n.肖像
+agent	n.动因、代理
+weave	v.（纺、编）织
+scatter	v.（使）散开
+implement	v.实施 n. 实施、器具
+voyage	n.航程
+inspire	v.激发
+strain	n.压力	n. (细菌、植物等的）类型
+imitate	v.模仿
+timber	n.木材
+rank	n.级别、成员 v 使排列
+concentrate	v.聚集
+container	n.容器
+article	n.物品、文章
+sink	v.下沉
+ecology	n.生态学
+reward	v&n.奖励
+mantle	n.地幔
+telescope	n.望远镜
+subsequent	adj.随后的
+episode	n.事件、片段
+emergence	n.出现
+sort	n.种类 v.分类
+burial	n.埋葬
+laboratory	n.实验室
+compass	n.指南针
+mode	n.模式
+entertainment	n.娱乐
+purchase	v.购买
+profession	n.职业
+theme	n.主题
+laborer	n.体力劳动者
+decide	v.决定、断定
+firm	n.公司 adj.牢固的
+collide	v.碰撞
+twist	v.扭曲
+irregular	adj.不规律的、不规则的
+fund	v.资助 n.基金
+historian	n.历史学家
+female	n&adj.女性（的）、雌性（的）
+emit	v.发出、散发
+retreat	v&n.撤退
+deficiency	n.缺乏
+rotate	v.旋转
+symbiotic	adj.共生的
+alternative	adj.另外的 n.可供替代的选择
+vertical	adj.垂直的
+circle	n.圆圈 v.环绕
+eruption	n.爆发、喷发
+treat	v.对待、处理	v. 诊治
+politics	n.政治
+confirm	v.证实
+specimen	n.样本
+tide	n.浪潮
+weigh	v.称（重）	v. 重量为、权衡
+encounter	v&n.遇到、遭受
+emission	n.发出、散发
+log	n.原木 v.伐木
+prevail	v.盛行
+roof	n.屋顶
+overall	adv&adj.总体（的）
+chain	n.链条
+pose	v.形成、摆姿势
+cylinder	n.圆柱	n. 气缸
+aesthetic	adj.审美的、艺术的
+neighborhood	n.附近
+hemisphere	n.半球
+excavate	v.挖掘
+ensure	v.确保
+orbit	n.轨道
+blow	v.吹
+grind	v.磨（碎、牙）（过去式ground）
+cease	v.停止
+incorporate	v.混合、并入	v. 包含
+automatically	adv.自动地
+crude	adj.粗制的、未加工的	adj. 粗略的
+version	n.版本
+capture	v.捕获
+hang	v.悬挂、垂下
+income	n.收入
+freedom	n.自由
+separation	n.分开
+recharge	n.补充
+motivation	n.动力
+penetrate	v.穿过
+collective	adj.集体的
+nerve	n.神经
+engrave	v.雕刻
+disadvantage	n.劣势
+constitute	v.构成
+reference	n.参考
+trigger	v.引起 n.扳机
+geology	n.地质
+spin	v.转动 n.纺织
+row	n.排
+secrete	v.分泌
+tremendous	adj.巨大的
+astronomer	n.天文学家
+bare	adj.光秃的、仅仅的
+inhibit	v.抑制
+accelerate	v.加速、使加速
+assist	v&n.协助
+enclose	v.包围、装
+reptile	n.爬行动物
+popularity	n.流行
+ash	n.灰
+institution	n.机构
+religion	n.宗教
+conserve	v.保存、保全
+traffic	n.交通、运输
+digest	v.消化
+application	n.应用
+gravity	n.重力
+precipitation	n.降水、沉淀
+mercy	n.仁慈
+sail	n.帆 v.航行
+recall	v&n.回忆
+boom	n.快速发展
+administration	n.管理
+durable	adj.持久的、牢固的
+undertake	v.着手、承担
+finance	n.财务 v.资助
+seal	n.印章、海豹 v.密封
+guide	v&n.引导
+exceed	v.超过
+reform	n&v .改革
+switch	n.开关 v.转变
+crucial	adj.至关重要的
+contradict	v.反驳、与……矛盾
+verbal	adj.言语的
+attach	v.依附
+supplement	v&n.补充
+span	v.持续（时间）、横跨 n.一段时间
+freshwater	n.淡水
+successive	adj.连续的
+official	adj.官方的 n.官员	adj. 正式的
+appreciate	v.理解到、欣赏
+outline	n.轮廓	n. 概述 v.画轮廓、概述
+threat	n.威胁
+strengthen	v.（使）加强
+classic	adj.经典的
+delicate	adj.脆弱的、优美的
+colleague	n.同事
+bronze	n.青铜
+medium	n.媒介[pl. media]、手段	adj.中等的
+dome	n.圆顶
+script	n.书写体系
+thrive	v.繁荣发展
+fiction	n.小说
+partially	adv.部分地
+vehicle	n.机动车、媒介
+marsh	n.沼泽
+freight	n.货物
+manufacture	v&n.生产
+intrigue	v.激起好奇心
+hatch	v.（使）孵
+shore	n.岸
+utilize	v.使用
+tube	n.管子
+implication	n.暗示、可能的结果
+drag	v.拖拽 n. 拖拽	n. 阻碍
+precious	adj.珍贵的
+velocity	n.速度
+burst	n&v .爆发
+path	n.路径
+refine	v.完善、提炼
+intellectual	adj.智力的、知识的 n.知识分子
+integrate	v.整合
+rush	n.匆忙 v.急促移动
+spray	n.喷雾装置 v.喷
+lay	v.下蛋、奠定（基础等）
+bite	v.咬
+harm	n&v .伤害
+sponsor	v.赞助 n.赞助商
+unpredictable	adj.不可预测的
+cooperation	n.合作
+irrigate	v.灌溉
+roll	v.滚动、卷 n.卷
+larva	n.幼虫（复数larvae）
+sharp	adj.剧烈的、尖的
+peasant	n.农民
+plastic	n.塑料
+genetic	adj.基因的
+chief	adj.首要的
+beneficial	adj.有益的
+impressive	adj.给人深刻印象的
+foundation	n.基础
+evident	adj.清晰易见的
+orient	v.定位
+barren	adj.贫瘠的
+prosperity	n.繁荣
+pace	n.速度
+empire	n.帝国
+contract	n.合同 v.收缩
+stoneware	n.（粗）陶器、石器
+forage	v.觅食
+norm	n.标准、常规
+condense	v.（使）压缩
+cope	v.处理
+frost	n.霜
+client	n.客户
+fertile	adj.肥沃的
+attain	v.获得、达到
+facilitate	v.促进
+flexible	adj.灵活的	adj. 有弹性的、易适应的
+judge	v.判断、估计
+progressive	adj.进步的、逐渐的
+concentrate	v.聚集
+adjacent	adj.邻近的
+participate	v.参与
+specialization	n.专业化
+confuse	v.（使）混乱、困惑
+twig	n.树枝
+herb	n.草
+mold	n.模子
+facility	n.设施
+ignore	v.忽视
+evaluate	v.评估
+fauna	n.动物群
+discharge	n.释放（量）
+desirable	adj.合意的
+scarce	adj.短缺的
+profound	adj.深远的、重大的
+modest	adj.适度的、谦逊的	adj. 较小的、朴实无华的
+department	n.部门、系
+mobile	adj.移动的
+salty	adj.含盐的
+slope	n.斜坡
+forecast	v&n.预言
+conceal	v.隐藏
+seep	v.渗透
+stomach	n.胃
+target	n.目标
+battle	n.战斗
+interfere	v.干扰
+plentiful	adj.大量的
+shade	n.阴凉
+semiarid	adj.半干旱的
+renaissance	n.文艺复兴
+deliver	v.交送
+sibling	n.兄弟姐妹
+click	v.点击
+strip	n.条
+stock	n.股份、牲畜
+suppress	v.抑制、镇压
+spontaneous	adj.自发的、自然的（行为）
+earthquake	n.地震
+cognitive	adj.认知的
+maximum	n.最大值
+spiral	v.螺旋式生长或移动 adj.螺旋的
+relevant	adj.相关的
+elect	v.选举
+elevation	n.海拔、高地
+debate	n&v .争论
+equivalent	n.等价物 adj.相等的
+succeed	v.成功、接替
+aware	adj.意识到的
+commodity	n.商品
+speculation	n.猜测、投机
+luxury	n.奢侈品
+wool	n.（羊等动物的）毛、毛料
+proper	adj.适宜的
+dairy	adj.奶质的
+phase	n.阶段
+substantial	adj.大量的
+confine	v.局限
+realm	n.王国、领域
+intermediate	adj&n.中间（的）
+proponent	n.支持者
+tip	n.尖端
+partnership	n.合伙关系
+niche	n.生态龛(= 通常是指在生态系统和群落中,一个物种与其他物种相关联的特定的时间位置、空间位置和功能地位) 、有利可图的市场
+logical	adj.逻辑的、合理的
+cavity	n.洞腔
+primate	n.灵长类
+district	n.区
+stationary	adj.静止不动的
+measurement	n.测量
+swallow	n.燕子 v.吞没
+bay	n.海湾
+squeeze	n&v .挤压
+pack	n.群 v.包装	n. 包、套 v. 捆扎、塞满
+populate	v.聚居、占据
+defend	v.保护、为……辩护
+disturb	v.扰乱
+harbor	n.港口
+tract	n.(土地、器官等的）片、道
+protein	n.蛋白质
+hollow	adj.空的
+slip	v.滑（落、倒）
+illuminate	v.照亮、阐明
+spear	n.矛
+review	v&n.回顾、评论	v. 复查
+tablet	n.碑
+aside	adv.一边地
+illusion	n.错觉
+cliff	n.悬崖
+stiff	adj.硬的、绷紧的
+cow	n.奶牛 v.威胁
+terminal	adj.终端的 n. 终点	n. 终端机
+herd	n.畜群 v.放牧
+tolerate	v.承受
+virtue	n.美德、优势
+tactic	n.策略
+contaminate	v.污染
+accomplish	v.做到、达成
+mere	adj.单单的、仅仅的
+immune	adj.免疫的
+disagreement	n.争议
+entrepreneur	n.创业家
+ingredient	n.要素
+prominent	adj.突出的
+alarm	n.警报 v.警告
+proceed	v.推进、继续
+feat	n.功绩
+angle	n.角度
+coordinate	v.（使）协调
+substitute	n&v.替代（者）
+margin	n.边缘	n. 差数（两个数值之间的差值）
+warn	v.提醒
+motive	n.动机
+adequate	adj.足够的
+correspond	v.对应
+invade	v.侵入
+sensitive	adj.敏感的
+humidity	n.湿度
+peripheral	adj.周边的
+odor	n.气味
+conquer	v.征服
+loyalty	n.忠诚
+strictly	adv.严格地
+impose	v.强加
+disperse	v.（使……）扩散
+relic	n.遗迹
+pile	n.堆
+management	n.管理
+suspend	v.悬（挂、浮）、暂停
+camera	n.照相机
+pigment	n.颜料
+hire	v.雇佣
+darkness	n.黑暗
+ready	adj.准备好的、方便的
+instinct	n.本能
+browse	n.嫩（草、叶、枝） v.浏览
+intention	n.意图
+injury	n.伤害
+sight	n.视野、景象
+fault	n.错误、缺点	n. 断层 v.出错、产生断层
+saturate	v.使充满
+well-being	n.健康快乐状态
+inclusion	n.内含物
+sheer	adj.纯粹的
+abstract	adj.抽象的
+assessment	n.评估
+arise	v.出现、由……产生
+compress	v.压缩
+fade	v.（逐渐）消失
+invest	v.投资、投入（时间等）
+debt	n.负债
+mild	adj.温和的、温暖的
+consciously	adv.有意识地、神志清醒地
+advocate	v.倡导 n.拥护者
+nomadism	n.游牧
+catastrophe	n.大灾难
+poem	n.诗
+ratio	n.比例
+inadequate	adj.不足的
+strategy	n.战略
+geothermal	adj.地热的
+reclaim	v.开垦
+restoration	n.恢复、复原
+legislation	n.立法
+crowd	n.群
+presumably	adv.很可能
+metabolism	n.新陈代谢
+repress	v.抑制
+reserve	v&n.保留
+court	n.法庭（人员）、王宫（人员）、球场
+rational	adj.理性的
+criterion	n.标准
+foster	v.促进
+inevitable	adj.不可避免的
+controversial	adj.有争议的
+geographic	adj.地理学的
+harmony	n.和谐
+identical	adj.完全相同的
+mutual	adj.相互的
+plow	n.犁 v.犁地
+minimum	n.最小量
+depletion	n.耗减
+violent	adj.剧烈的、暴力的
+sedimentation	n.沉淀
+agency	n.机构、力量
+temple	n.庙
+remote	adj.遥远的、偏僻的
+ornament	n.装饰
+tie	v&n.联系、领带
+simplify	v.简化
+equator	n.赤道
+drainage	n.排水（系统）
+silk	n.丝绸
+antarctic	adj.南极洲的
+friction	n.摩擦
+excess	n&adj.过量（的）
+vulnerable	adj.易受伤害的
+effectively	adv.有效地、实际上地
+flee	v.逃离
+objective	n.目标 adj客观的
+inspiration	n.灵感
+sector	n.部门
+split	v&n.分开
+alternate	adj.轮流的 v.交替
+guarantee	v&n.确保
+ultimately	adv.最终地
+journey	n.行程
+metropolis	n.大都市
+urge	v.竭力主张[urge sb to do sth 敦促sb去做sth] n.强烈欲望
+deform	v.（使）变形
+so-called	adj.被称作……的
+withstand	v.抵御
+immense	adj.巨大的
+hierarchy	n.等级制度、统治集团
+commission	n.委员会、委托
+intend	v.打算、想要
+interlock	v.连结、相互关联
+insulate	v.（使）隔离、（使）绝缘
+mission	n.使命
+monumental	adj.巨大的、纪念碑的	adj. 不朽的
+`,
+  "核心词汇": `theory	n. 理论
+without	prep. 没有……
+within	prep. 在……里
+extinction	n. 灭绝
+physical	adj. 身体的、实物的（=可以被看见、摸到的）	adj. 物理的
+thus	adv. 因此
+affect	v. 影响
+deer	n. 鹿
+contribute	对……有贡献	捐献、是……的原因
+addition	n. 添加（物）
+transportation	n. 交通运输
+original	adj. 起初的（=起源性的）、最早的、独创性的
+evolve	v. 进化、逐步发展
+religious	adj. 宗教的
+throughout	prep.&adv. 自始至终、遍及
+atomic	adj. 原子的
+consist	由……组成
+volcanic	adj. 火山的
+literature	n. 文学
+variation	n. 变化
+bacteria	[复] 细菌(单数是bacterium）
+perform	v. 做、表演、行使、表现
+fort	n. 堡垒
+expansion	n. 扩大
+observation	n. 观察
+aggression	n. 攻击性
+equal	adj. 相等的、平等的 v. 等于
+generate	v. 生产
+characterize	v. 刻画／描述……特征
+diversity	n. 多样性
+stability	n. 稳定
+artistic	adj. 艺术的
+nitrogen	n. 氮
+fee	n. 费用
+electron	n. 电子
+existence	n. 存在
+folk	n. 人 adj. 民间的 [folk stories 民间故事]
+survival	n. 生存
+concentration	n. 聚集
+interior	adj.内部的
+density	n. 密度
+stimulate	v. 刺激、促进
+whereas	conj. 然而
+rely	依赖于……
+average	n. 平均（值）adj.平均的、正常的
+insert	v. 插入
+geometric	adj. 几何学的
+compose	v. 创作、构成 [ be composed of... 由……组成]
+paleolithic	n.&adj. 旧石器时代
+migrate	v. 迁徙
+adaptation	n. 适应、适应性变化
+construct	v. 建造
+threaten	v. 威胁
+exhibit	v. 表现出
+sculptor	n. 雕刻家
+consumer	n. 消费者
+abundance	n. 大量、数量
+moreover	adv. 此外、而且
+convention	n. 大型会议、惯例	n. (国际）公约
+destructive	adj. 毁灭性的
+decoration	n. 装饰
+reproduction	n. 繁殖
+dominant	adj. 处于支配地位的
+distribution	n. 分（散、布）	n. 分（发、开、类）
+pastoralism	n. 畜牧
+pollutant	n. 污染物
+accumulation	n. 累积
+enlarge	v.（使）增大
+virus	n. 病毒
+erode	v. 侵蚀、削弱
+metallic	adj. 金属的
+tendency	n. 倾向
+variability	n. 可变性
+motif	n. 主题	n. 图案
+component	n. 组成部分
+career	n. 职业生涯
+evaporation	n. 蒸发
+consequent	adj. 作为结果的
+union	n. 联盟
+resistance	n. 抵抗（力）、阻力
+candidate	n. 候选人
+cultivation	n. 种植
+freezing	adj. 冰冷的
+mislead	v. 误导
+hind	adj. 后面的 [hind leg 后腿]
+hence	adv. 因此
+interpretation	n. 解释、理解
+reduction	n. 减少
+transformation	n. 改变
+consumption	n. 消耗、消费
+operation	n. 行动、操作
+satellite	n. 卫星
+architect	n. 建筑师
+classical	adj. 古典的
+storage	n. 储存
+investor	n. 投资者
+interact	v. 相互作用
+calcium	n. 钙
+entrance	n. 入口
+neolithic	n.&adj. 新石器时代
+spore	n. 孢子
+theatrical	adj. 戏剧的
+commerce	n. 商业
+dramatically	adv. 剧烈地、显著地、突然地
+colonization	n. 殖民、移生
+invertebrate	n. 无脊椎动物
+politician	n. 政治家
+format	n. 样式
+costume	n. 戏服
+occurrence	n. 发生（的事件）
+reliance	n. 依赖
+score	n. 得分、二十	n. 配乐
+gene	n. 基因
+mixture	n. 混合（物）
+sedimentary	adj. 沉积的
+representation	n. 代表、描绘
+regulation	n. 控制、调整
+fluctuate	v. 波动
+assumption	n. 假定
+delivery	n. 交送
+comparable	adj. 可比的
+panel	n. 面板
+react	v. 做出反应
+crustal	adj. 地壳的、壳的
+periodical	adj. 定期的
+impression	n. 印象
+mobility	n. 移动性
+retrieve	v. 找回、检索
+nuclear	adj. 核的
+nutrition	n. 营养
+exposition	n. 展览
+imitation	n. 模仿
+brush	n. 刷子
+lava	n. 岩浆
+mirror	n. 镜子；v. 反映
+background	n. 背景
+egalitarian	adj. 平等主义的
+extensively	adv. 广泛地
+occupation	n. 占据、职业
+insulation	n. 隔离、绝缘
+shield	n. 盾、防护（物）
+perceptual	adj. 感知的
+cement	v. 把……结合一起
+maintenance	n. 维持
+regardless	adv. 不管、不顾
+wavelength	n. 波长
+profitable	adj. 可盈利的
+revolutionary	adj. 革命性的
+strict	adj. 严格的
+gallery	n. （艺术）馆、（走、画）廊
+merely	adv. 仅仅
+equatorial	adj. 赤道的
+influential	adj. 有影响力的
+equip	v. 装备
+ceremonial	adj. 仪式的
+properly	adv. 适宜地、正确地
+exploration	n. 探索、勘探
+utility	n. 实用、公共事业
+steadily	adv. 稳定地
+deprive	v. 剥夺
+innovative	adj. 创新的
+underlie	v. 位于……的下面
+poet	n. 诗人
+minimize	v. 最小化
+address	n. 地址 v. 处理	v. 论述、对……演讲
+terrace	v. 使成阶地
+swamp	n. 沼泽地
+designate	v. 命名
+constitution	n. 宪法
+patent	n. 专利 v. 得到……专利
+dispersal	n. 扩散
+subway	n. 地铁
+geographical	adj. 地理学的
+pride	n. 骄傲、一群 [a pride of lions 一群狮子]
+calculation	n. 计算
+regularity	n. 规则性、规律
+request	n. 要求
+conservation	n. 保护
+questionnaire	n. 问卷
+illumination	n. 照亮、阐明
+genius	n. 精神特质
+proposal	n. 提议
+isolation	n. 孤立、隔离
+enrich	v. 使丰富	v. 充实、富饶
+botanical	adj. 植物学的
+confederacy	n. 联盟
+fertilize	v. 使受精、使肥沃
+odd	adj. 古怪的
+accord	v. 相一致
+species	n. 物种
+form	n. 形式 v. 形成	n. 外形
+state	n. 状态、州、国家、政府
+soil	n. 土壤
+evidence	n. 证据 v. 证明
+light	n. 光（线） adj. 轻的、浅色的、少的 v. 照亮
+lead	v. 导致 n. 铅
+contain	v. 包含、容纳
+source	n. 来源
+planet	n. 行星
+seed	n. 种子
+term	n. 术语、（工作或居住）期间、条款、学期; v. 把..叫作
+appear	v. 出现 [appear to 看起来、似乎]
+clear	adj. 清楚的、透明的、不接触的[clear of sth]、晴朗的、开阔的
+layer	n. 层
+continent	n. 大陆
+element	n. 元素、要素
+event	n. 事件
+function	n. 功能
+respond	v. 回应
+goods	n. 商品
+sound	n. 声音、海湾 adj. 健康的、合理的
+pollen	n. 花粉
+still	adv. 仍然、还
+lack	v. 缺少
+meteor	n. 流星
+eventual	adj. 最终的
+reef	n. 礁
+apply	应用、申请、适用于
+mineral	n. 矿物质
+measure	v. 测量 n. 手段	n. 标准
+tropics	n. 热带
+surround	v. 包围
+feature	n. 特征 v. 是……的特征、以……为特征
+breath	n. 呼吸
+advance	n. 前进
+due	adj. 到期的、应得的 [due to sth 由于sth]
+means	n. 手段、方法
+radiate	v. 散发、辐射
+reside	v. 居住
+prove	v. 证明（是）
+define	v. 定义	v. 阐述、限定（界限）、勾画轮廓
+alga	n. 水藻［单］(pl. algae）
+credit	n. 贷款、学分、信用
+beg	v. 乞讨
+drive	v. 驱动、驱赶
+globe	n. 全球
+metabolic	adj. 新陈代谢的
+situate	v. 使处于
+semester	n. 学期
+charge	n. 充电、电荷、掌管
+cooperate	v. 合作
+model	n. 模型、理论模式
+capital	n. 资本、首都、大写
+collapse	v. 崩溃、坍塌
+administer	v. 管理
+concern	n. 关心、顾虑
+glide	v. 滑（行、翔）
+occasion	n. 场景、机会
+course	n. 过程、航道、课程
+mechanical	adj. 机械的
+series	n. 系列
+bank	n. 银行、河岸、库存
+bury	v. 埋
+moist	adj. 湿润的
+progress	n. 进展、进化
+bone	n. 骨头
+contact	n. 联系
+venom	n. 毒液、怨恨
+vertebral	adj. 脊椎的
+bottom	n. 底（部、层）
+elevate	v. 抬高
+exclude	v. 排除在外
+yield	n.&v. 产出
+display	v. & n. 展示
+mate	v.&n. 交配（对象）
+edge	n. 边缘、优势（an edge over sth)、(刀）刃
+issue	n. 问题 v. 颁布	n. 议题 v. 流出、导致
+shelf	n. 架
+brief	adj. 短暂的
+piece	n. （文章或者艺术品的）块、片、首（等单位） [本身没有碎片的意思]
+plenty	n. 丰富
+respect	n. 尊重、方面	in respect to/of sth 涉及到、关于
+carnivore	n. 食肉动物
+aristocracy	n. 贵族阶级
+investigate	v. 调查
+photosynthesis	n. 光合作用
+descend	v. 下（来）
+solitary	adj. 独处的
+tiny	adj. 极小的
+tolerant	adj. 能耐的
+delta	n. 三角洲
+intensive	adj. 密集的 [labor-intensive 劳动密集型的]、加强的
+restore	v. （使）恢复、复原
+virtual	adj. 事实上的
+custom	n. 风俗习惯
+prosper	v.（使）繁荣
+consolidate	v. 联合、加强
+fight	v.&n. 打架
+palace	n. 宫殿
+precipitate	v. 使沉淀、(水汽等)凝结(成雨、露、雪等)
+humid	adj. 潮湿的
+sedentary	adj. 不活动的
+beam	n. （房）梁、（一）束（光）
+filter	v. 过滤
+replicate	v. 复制
+ultimate	adj. 最终的
+autobiographical	adj. 自传的
+bat	n. 蝙蝠
+campus	n.（大学的）校园
+cloth	n. 布
+found	v. 建立（found-founded-founded）
+persist	v. 持续存在
+sacred	adj. 神圣的
+simultaneous	adj. 同时的
+tense	v.（使）绷紧
+decompose	v.（使）分解
+dwell	v. 居住
+faculty	n. 全体教员
+permeate	v. 渗透
+weed	n. 杂草
+accident	n. 偶然事件、意外事故
+bind	v.（使）结合、约束
+celebrate	v. 公开举行(宗教仪式等)
+flora	n. 植物群
+nomad	n. 游牧民
+scene	n. 景象、场面
+definite	adj. 明确的
+depress	v. 使沮丧、降低、压下
+diffuse	v. 扩散
+distract	v. 分散（注意力）	v. （使）转移、扰乱
+erupt	v. 爆发、喷发
+fix	v. 修理、固定、确定（日期等时间）、准备（食物等）
+locomotion	n. 移动（力）
+corporate	adj.&n. 公司的
+deficient	adj. 不足的
+deplete	v. 消耗
+infect	v. 感染
+literacy	n. 读写能力(=文盲反义词）
+magnify	v. 放大
+transmit	v. 传播
+admit	v. 承认、允许进入
+aquatic	adj. 水（生）的
+horizon	n. 地平线
+outbreak	n. （战争、疾病等的）爆发
+pest	n. 害虫
+presume	v. 推测
+screen	n. 屏幕
+spectacle	n. （盛大活动等的）演出、奇观
+speculate	v. 猜测
+suffer	v. 遭受
+bill	n. 票据、（鸟）喙；v. 开账单
+bright	adj. 明亮的、鲜艳的
+disrupt	v. 扰乱
+edit	v. 编辑
+steep	adj. 陡峭的、急剧的
+tomb	n. 坟墓
+coin	v. 创造
+crown	n. （树、皇、花）冠
+item	n. 物品
+joint	adj. 联合的
+reinforce	v. 加强、增援
+segment	n. 部分
+sting	v. 叮
+symbiosis	n. 共生
+temporary	adj. 暂时的
+acoustics	n. 声学、传声效果
+chorus	n. 齐声（叫喊等）
+clerk	n. 职员
+controversy	n. 辩论
+gap	n. 空隙、差距
+germinate	v. 发芽
+hole	n. 洞
+maxim	n. 格言
+monument	n. 纪念物（如碑、塔、馆等）
+resolve	v. 解决、(光学仪器等的）分辨
+rival	adj. 竞争对抗的 n. 竞争对手
+spice	n. 香料
+budget	n. 预算(=政府/组织/个人等作一件事情可以使用的钱的总额）
+duration	n. 持续（期间）
+harsh	adj. 严酷的、荒芜的
+inherit	v. 继承
+journal	n. 期刊
+loan	n. 贷款
+pasture	n. 草场
+predominate	v. 占主导地位
+scribe	n. 书写员、文书
+automatic	adj. 自动的
+council	n. 委员会
+fashion	n. 时尚、方式[in the same fashion 以相同的方式]	v. 形成、塑造
+intelligence	n. 智力
+mortality	n. 死亡率
+pond	n. 池塘
+royal	adj. 皇家的
+academic	adj. 学术的
+assess	v. 评估
+biodiversity	n. 生物多样性
+deliberate	adj. 有意的
+diminish	v. （使）减少
+net	n. 网 adj. 净（值）(收入-支出= net profit 净利润）
+noise	n. 噪音、声音
+port	n. 港口
+radical	adj. 重大的、激进的
+straight	adj. （笔、径）直的
+transaction	n. 交易
+vegetable	n. 蔬菜、植物
+induce	v. 引起
+injure	v. 伤害
+plausible	adj.合理的
+sphere	n. 领域、球体
+supervise	v. 监管
+susceptible	adj. 易受影响的
+unify	v. 统一
+artifact	n. 手工艺品
+auditory	adj. 听觉的
+combat	v. （与……）搏斗、防止
+comfort	n. 舒适
+comprehend	v. 理解
+constrain	v. 约束、迫使
+delay	v. 延迟
+fringe	n. 边缘
+monopoly	n. 垄断
+vigorous	adj. 强健的
+wage	n. 工资
+alert	adj. 警觉的
+autonomy	n. 独立自主
+compensate	v. 补偿
+comprise	v. 由……组成
+dimension	n. 方面、规模、维度
+disaster	n. 灾难
+disk	n. 盘状物
+entertain	v. 娱乐、考虑（一个想法或建议）
+heighten	v. 增加
+intervene	v. 干涉
+outweigh	v. 超过
+precursor	n. 先驱、（地震等的）前兆
+receptionist	n. 接待员
+ruin	v. 毁灭
+surpass	v. 超过
+thermal	adj. 热的
+abrupt	adj. 骤然的
+ambition	n. 野心
+ample	adj. 充足的
+anatomy	n. 解剖学
+blend	v. 混合
+bulk	n. 大块、体积	n. 大（量、部分）
+cite	v. 引用（一个人的话、文献）
+code	n. 法规、代码
+conscious	adj. 有意识的、神志清醒的
+drastic	adj. 剧烈的、极广泛的
+dynamic	adj. 动态的
+embryo	n. 胚胎
+extraordinary	adj. 非凡的
+glory	n. 荣耀成就
+grand	adj. 宏伟的
+ingenious	adj. 原创的、心灵手巧的
+juvenile	n. 幼年
+loyal	adj. 忠诚的
+magnet	n. 磁铁、有吸引力的事物
+manuscript	n. 手稿
+moderate	adj. 温和的、适度的
+obstacle	n. 障碍
+optical	adj. 光学的、视力的
+prestige	n. 威望
+recruit	v. 招募
+reluctant	adj. 不情愿的
+scavenge	v. 从……提取有用东西
+senior	adj.&n. 级别高的（人）、年长的（人）
+sketch	n. 素描
+sparse	adj. 稀疏的
+subsidy	n. 补贴金
+tutor	n. 导师
+vocal	adj. 嗓音的
+worship	n. 敬奉(神灵等）
+accustom	v. 使习惯 （be accustomed to sth 习惯于sth）
+bend	v.（使）弯曲
+blade	n.（刀、叶）片
+blanket	n. 覆盖层、毯子
+bloom	v. 开花
+conform	v. 遵循
+deteriorate	v. 恶化
+devote	v. 奉献
+eject	v. 喷出
+inhospitable	adj. 不适宜居住的
+mental	adj. 心理上的
+monitor	v. 监控 n. 监控器
+prime	adj. 主要的、最佳的
+procedure	n. 程序
+prohibit	v. 禁止
+pyramid	n. 金字塔（结构）
+quote	v. 引用（一个人的话）
+repair	n.&v.修理
+respective	adj. 各自的
+respiration	n. 呼吸
+scent	n. 气味
+starve	v.（使）挨饿
+subtle	adj. 不易察觉的
+thorough	adj. 彻底完全的
+ally	v. 同盟
+analogy	n. 类比
+applaud	v. 鼓掌
+culminate	v. 到顶点、以……告终
+curve	n. 曲线 v. 沿曲线前进
+deceive	v. 欺骗
+devastate	v. 毁灭
+distort	v. 曲解、扭曲
+diverge	v. 分开、不同
+fascinate	v. 使着迷
+fate	n. 命运
+fulfill	v. 实现、满足
+hibernate	v. 冬眠
+install	v. 安装
+intersect	v. （线条、区域）相交
+package	n. 有关联的一组事物
+pale	adj. 浅色的、苍白的	v 黯然失色
+paradox	n. 悖论
+parallel	adj. 平行的、类似的
+plague	n. 瘟疫
+platform	n. 平台
+poison	v. 投毒
+prolong	v. 延长
+recur	v. 再现
+regime	n. 体制、统治
+relics	n. 残存物
+remind	v. 使想起
+slide	n. 滑动、幻灯片
+vicinity	n. 附近
+video	n. 视频
+wedge	n. 楔形物
+aggregate	v. 聚集
+announce	v. 宣布
+attic	n. 阁楼
+blind	adj. 失明的
+camouflage	v. 伪装
+certify	v. （用证书等）证明（合格）
+coarse	adj. 粗糙的
+comment	n. 评论
+compromise	n. 妥协、折中
+converge	v.（使）聚集
+discard	v. 丢弃
+enterprise	n. 企业、事业
+entry	n. 进入
+epidemic	n.（疾病等坏事）的流行
+faith	n. 信念
+gym	n. 健身房
+imperial	adj. 帝国的
+incidence	n. 发生（率）
+insight	n. 深入见解
+intact	adj. 完整无缺的
+intermittent	adj. 断断续续的
+internship	n. 实习期
+interview	v. 询问
+launch	v. 发起
+leak	v. 渗漏
+manifest	v. (特定特征、疾病、情感等）显现
+meadow	n. 草地
+neglect	v. 忽略
+oblige	v. 迫使
+patch	n. 块
+peculiar	adj. 独特的
+reign	n.&v. 统治（时期）
+remnant	n. 残余物
+replenish	v. 重新填满
+rudimentary	adj. 最基本的
+scan	v. 扫描、仔细查看
+simulate	v. 模拟
+submit	v. 提交（作业、申请等）
+suspect	v. 觉得、怀疑
+tight	adj. 紧的
+trick	n. 戏法
+trunk	n. 树干
+via	prep. 通过
+vibration	n. 振动
+absolute	adj. 十足的、绝对的
+adverse	adj. 不利的
+allocate	v. 分配
+appoint	v. 任命
+blame	v. 责备 [blame sb for sth 指责sb sth]
+calendar	n. 日历
+card	n. 卡
+chamber	n. （超大的或特殊用途的）房间
+chant	n. 歌曲
+command	v. 控制、指导
+companion	n. 同伴
+compel	v. 迫使 [compel sb to do sth 迫使sb 做sth]
+conceive	v. 相信
+concert	n. 音乐会 、协调[in concert with 与……协调/一致]
+conspicuous	adj. 显眼的
+dormant	adj. 休眠的
+endow	v. 赋予（特征、品质）[be endowed with sth 天生赋予]
+erect	adj. 直立的 v. 建造、（使）竖立
+execute	v. 执行（计划、命令等）
+harness	n. 马具 v. 利用
+hostile	adj. 不友善的
+incentive	n. 动机
+manipulate	v. 操纵（一个事件、舆论）
+notion	n. 想法
+obsolete	adj. 过时的
+overwhelm	v. 击溃、压倒
+portable	adj. 便携的、可移动的
+prone	adj. 易于……的 [be prone to sth 易于……]	趴着的
+prospect	n. 可能性
+proximity	n. 接近
+render	v. 使变得、使成为 [render the river dark 让河水变暗]
+routine	n. 常规 [daily routine 日常事务]
+seminar	n. 研讨会
+synchronize	v.（使）同步（发生）、同时（发生）
+synthesis	n. 合成
+tame	adj. 驯化的
+throat	n. 喉咙
+troop	n. 军队
+turbulent	adj. 动荡的（局面、气流）
+valid	adj. （从逻辑、法律文件来说）有根据的
+wine	n. 葡萄酒
+advent	n. 到来
+approve	v. 赞同、批准
+auditorium	n. 礼堂
+authentic	adj. 真实可靠的
+bet	n. 打赌
+bit	n. 一点儿
+bucket	n. 桶
+cargo	n. 货物
+cent	n. （美）分
+cessation	n. 停止
+chase	v. 追赶
+chronicle	n. 编年史
+clarify	v. 讲清楚
+coexist	v. 共存
+cohesive	adj. 有聚合性的(=能很好的拼起来构成一个整体）
+coincide	v. 恰好相同
+comic	adj. 漫画的
+commit	v. 承诺	v. （使……）束缚
+complain	v. 抱怨
+configuration	n. 布局、轮廓
+convenient	adj. 方便的
+cosmic	adj. 宇宙的
+counterpart	n. 对应的人或物（Someone's or something's counterpart is another person or thing that has a similar function or position in a different place.）
+dispute	v. 反驳
+divert	v. 转移
+drawback	n. 缺点、障碍
+embody	v. 体现
+entity	n. 实体(=独立存在并且有自己清晰身份的东西 These countries can no longer be viewed as a single entity）
+famine	n. 饥荒
+feasible	adj. 可行的 (=在现有资源和条件下能够被完成或达成的）
+fuse	v. 融合
+hasten	v. 加速
+impetus	n. 促进因素
+indigenous	adj. 本土的 （= native)
+infrastructure	n. 基础设施
+inventory	n. (东西的）清单、财产目录
+lunar	adj. 月球的
+nourish	v. 养育
+obliterate	v. 消除
+onset	n. 开始
+outcome	n. 结果
+oversee	v. 监督
+perish	v.（使）灭亡、腐烂
+pinpoint	v. 精准定位、识别
+plus	conj. 加 adv. 此外
+pour	v. 倒、喷涌
+prompt	v. 促使
+propagate	v. 繁殖
+pursue	v. 追（赶、求、击）、贯彻
+recreation	n. 娱乐
+resume	v. 重新开始 n. 简历
+retirement	n. 退休
+sacrifice	n. 牺牲
+shine	v. 照耀
+static	adj. 静止不变的
+subside	v. 下沉
+syllable	n. 音节
+trumpet	n. 喇叭 v. 发出喇叭似的叫声
+undergraduate	n. 大学本科生
+versus	prep. ……对……
+accommodate	v. 供应、对……给予照顾性考虑
+anticipate	v. 预期
+assert	v. 宣称、坚持
+batch	n.（一）批
+boast	v. 拥有（财产、成功等）、吹嘘
+brilliant	adj. 灿烂的、绝妙的
+chronic	adj. 慢性的（疾病等）
+clan	n. 群体
+conference	n. 会议
+confront	v.（使）面对
+consensus	n. 共识
+contour	n. 轮廓
+conversely	adv. 相反地
+convey	v. 传达（想法等）
+corrupt	v.（使）堕落
+currency	n. 货币
+dean	n. 学院院长、系主任
+deny	v. 拒绝、否认
+devil	n. 魔鬼
+devoid	全无……的
+dot	n. 点
+draft	v.&n. 征兵
+duplicate	v.&n.&adj. 复制（的）
+elongate	v.（使）拉长
+enroll	v. （新生、服兵役、课程等的）注册
+ethnic	adj. 种族的
+exert	v. 费（力）；施加（影响等）
+exotic	adj.&n. 外来的（事物）
+expanse	n. 广阔区域
+expertise	n. 专长 （= 专业知识/技能）
+explicit	adj. 明确的
+exterminate	v. 消灭
+flame	n. 火焰
+forbid	v. 禁止
+gentle	adj. 温和的
+glimpse	n. 一瞥
+halt	v.（使）停住
+hardly	adv. 几乎（不、没有）
+hazard	n. 危险
+heal	v. 治愈
+hinder	v. 阻碍
+impede	v. 阻碍
+incubate	v. 孵（化）
+inferior	adj. 较差的
+intimate	adj. 亲密的、深刻的
+intrinsic	adj. 本质的、固有的
+intrude	v. 扰乱、入侵
+jungle	n. 丛林
+layout	n. 布局
+legend	n. 传说
+license	n. 许可
+lure	v. 引诱 n. 诱饵
+lush	adj. 茂盛的
+lyric	adj. 抒情的
+marvel	n. 奇迹
+mediate	v. 调解（纠纷、异议等冲突）
+momentum	n. 势头、动力
+option	n. 选择
+owe	v. 欠、归因于
+perpetual	adj. 永恒的
+pertain	v. 适合、(与……）相关
+preoccupation	n. 当务之急、全神贯注
+proliferation	n. 激增
+remainder	n. 剩余部分
+retard	v. 减缓
+scratch	v. 刮擦
+secular	adj. 非宗教的
+seize	v. 抓住
+seldom	adv. 很少
+shadow	n. 影子
+staff	n. 全体职员
+stereotype	n. 模式化形象（=对一个东西/人的固定化的看法或形象，比如认为东北人都能喝酒）
+talent	n. 天赋
+thaw	v.（冰雪等）融化
+trial	n. 试验
+tribute	n. 贡品
+verify	v. 验证
+viable	adj. 能存活的
+wander	v. 漫步
+withdraw	v. 取走（存款等）、撤退
+spectator	n. 观众
+novelty	n. 新奇
+compaction	n. 压紧
+assistant	n. 助理
+astonish	v. 使惊讶
+spectacular	adj. 壮观的
+superiority	n. 优越
+postulate	n. 假定
+workshop	n. 作坊
+opponent	n. 反对者
+small-scale	adj. 小范围的
+shortage	n. 短缺
+symptom	n. 症状
+broadcast	v. 播放
+multiply	v.（使）大量增加
+inclination	n. 倾向、偏好
+frighten	v.（使）害怕
+volunteer	n. 志愿者
+fabric	n. 织物
+participant	n. 参与人
+exposure	n. 暴露
+digestive	adj. 消化的
+noticeable	adj. 引人注目的
+spirit	n. 精神、灵魂、幽灵
+viewer	n. 观众
+motivate	v. 使有动机
+undoubtedly	adv. 毋庸置疑地
+campaign	n. （社会、商业、政治等目的的）运动
+invisible	adj. 看不见的
+territorial	adj. 领土的
+inform	v. 告知
+chiefly	adv. 首要地
+progressively	adv. 进步地、逐渐地
+kingdom	n. 王国
+compression	n. 压缩
+rotation	n. 旋转
+basically	adv. 基本上
+circulate	v. 循环
+intricate	adj. 复杂精细的
+feedback	n. 反馈
+cure	n.&v. 解决（方案）、治愈
+bombard	v. 轰炸
+election	n. 选举
+medical	adj. 医学的
+mountainous	adj. 多山的
+removal	n. 移除
+cascade	n. 瀑布
+accessible	adj. 易得到的、浅显易懂的
+excavation	n. 挖掘
+fraction	n. 部分
+subsequently	adv. 随后地
+specify	v. 详细说明、指定
+besides	adv. 此外 prep. 除了……
+annually	adv. 年度地
+excessive	adj. 过多的
+adjustment	n. 调整
+markedly	adv. 显著地
+grant	v.&n. 赠予、准许
+muscular	adj. 肌肉的
+remarkably	adv. 非同寻常地
+institute	n. 组织	v. 制定(规章等）
+predecessor	n. 前身（=被替代的东西/人）
+medieval	adj. 中世纪的
+jewelry	n. 宝石
+church	n. 教堂、教会
+fundamentally	adv. 根本上
+unprecedented	adj. 前所未有的
+identity	n. 身份、同一性
+expenditure	n. 花费
+practically	adv. 几乎、实际上
+crew	n. 船员
+circular	adj. 环形的
+invasion	n. 侵入
+predatory	adj. 捕食性的
+traditionally	adv. 传统上
+plot	n. 剧情、小块圈地、绘制图 v. 绘制、密谋
+dwarf	v. 使显得小 n. 小矮（人、星）
+severely	adv. 严重地
+outstanding	adj. 杰出的	adj. 尚未解决的
+specifically	adv. 专门地、更确切地说
+vote	v. 投票
+envision	v. 设想
+adept	adj. 熟练的
+ease	n. 舒适 v. 减缓
+obscure	v. 掩盖
+uneven	adj. 不均衡的
+repudiate	v. 拒绝接受
+faunal	adj. 动物群的
+fame	n. 声誉 v. 使有名
+microorganism	n. 微生物
+probable	adj. 可能的
+inequality	n. 不平等
+immobile	adj. 不动的
+assistance	n. 协助
+mound	n. （土）堆
+security	n. 安全
+parasitic	adj. 寄生的
+disturbance	n. 扰乱
+triangle	n. 三角形
+reconstruct	v. 重建、使再现
+wound	v. 伤害
+integral	adj. 必不可少的
+prolific	adj. 多产的 （= 能产出很多东西的）
+coral	n. 珊瑚
+exterior	n. 外部
+inevitably	adv. 不可避免地
+utilitarian	adj. 注重实用的
+accomplishment	n. 成就
+transitional	adj. 过渡性的
+witness	v. 见证 n. 目击者
+web	n. （蜘蛛、互联）网
+tale	n. 故事
+dedicate	v. 献给、致力于
+disposal	n. （废物）清除、处理
+illustration	n. 说明、图例
+shatter	v. 粉碎
+makeup	n. 组成
+neutral	adj. 中（立、和、性）的
+large-scale	adj. 大范围的
+mood	n. 情绪、氛围
+interrupt	v. 妨碍、打断
+dive	v. & n. 潜水、俯冲、（使）骤降
+astronomy	n. 天文学
+tear	n. 眼泪 v. 撕烂（tore-torn）
+conversion	n. 转变
+negotiate	v. 协商、谈成	v. 成功穿过
+tidal	adj. 潮汐的
+unstable	adj. 不稳定的
+worm	n. 虫子
+mythical	adj. 神话中的
+backup	n. 后备 （比如文件的备份、打仗时的后援）
+intent	n. 意图 adj. 专注的
+substantially	adv. 很大程度地
+breeze	n. 微风
+landform	n. 地形
+relief	n. 缓解	n. 浮雕
+miniature	adj. 微型的 n. 缩影
+ingenuity	n. 原创性、心灵手巧
+efficiency	n. 效率
+inaccurate	adj. 不精确的
+vein	n. （静、叶）脉
+conception	n. 观念
+rental	adj. 出租的
+informal	adj. 不正式的
+enforce	v. 实施（= 执行法律、规章的要求）
+disagree	v. 不同意
+tourism	n. 旅游业
+ownership	n. 所有权
+prehistory	n. 史前时期
+consistently	adv. 始终地（= 前后一致地）
+notable	adj. 显著的、著名的
+rub	n.&v. 蹭
+beat	v. 敲打
+adorn	v. 装饰
+leap	v.&n. 跳跃
+planetarium	n. 天文馆
+humorous	adj. 幽默的
+bush	n. 灌木
+discern	v. （通个筛选区分）识别
+flaw	n. 缺点
+necessity	n. 必要性、必需品
+reasonably	adv. 合理地
+ceiling	n. （房子内部的）顶、天花板
+boredom	n. 无聊
+seemingly	adv. 看上去、似乎
+warrior	n. 勇士
+swift	adj. 迅速的
+weakness	n. 弱点
+prevalent	adj. 盛行的
+hereditary	adj. 世袭的、遗传的
+personality	n. 个性
+avenue	n. 街道、渠道
+ethic	n. 道德
+individualistic	adj. 个人主义的
+stylistic	adj. 风格上的
+exaggeration	n. 夸张
+hamper	v. 妨碍
+unpleasant	adj. 令人不愉快的
+reptilian	adj. 爬行动物的
+conclusive	adj. 决定性的
+differentiate	v. 区分
+stiffen	v.（使）变硬
+reminder	n. 提醒物
+assure	v. 确保（得到）
+sizable	adj. 相当大的
+committee	n. 委员会
+loosely	adv. 松地
+dirt	n. 泥土
+enthusiastic	adj. 热情的
+proof	n. 证明
+evaluation	n. 评估
+modification	n. 改变
+buildup	n. 积聚、增加
+sponge	n. 海绵
+powder	n. 粉末
+hypothetical	adj. 假设的
+bias	n. 偏见
+far-reaching	adj. 影响深远的
+permanence	n. 永久
+repetition	n. 重复
+energetic	adj. 有活力的、能量的
+magic	n. 魔法
+pursuit	n. 追（赶、求、击）
+belt	n. （皮、缓冲、传送）带、带状物
+perplex	v. 使困惑
+yard	n. 院子
+legendary	adj. 传奇的、大名鼎鼎的
+prairie	n. 大草原
+triumph	n. 成功
+built-in	adj. 内置的 （= 系统自带的）
+priority	n. 优先处理的事
+relieve	v. 缓解
+cosmos	n. 宇宙
+detectable	adj. 可察觉的
+adhere	v. 遵守……、紧贴……
+reputation	n. 声望
+inefficient	adj. 低效的
+continuity	n. 连续性
+explode	v. 爆炸
+adoption	n. 采用
+comedy	n. 喜剧
+exceptionally	adv. 例外地、非凡地
+defenseless	adj. 无防御的
+lag	n.&v. 滞后 （比如一个国家的发展滞后于另外一个国家）
+accompaniment	n. 伴随
+coastline	n. 海岸线
+enormously	adv.（程度、范围、体积、数量等）极大地
+pipe	n. 管子
+emperor	n. 皇帝
+tax	n. 税
+lessen	v. 减少、减轻
+domain	n. 领域
+disorder	n. 混乱
+defeat	v. 击败
+curriculum	n. 总课程
+revival	n. 复兴
+instinctive	adj. 本能的
+revolve	v. 旋转 （比如天体的公转）
+supplant	v. 取代
+appreciation	n. 欣赏、理解
+revitalize	v. 使复苏
+amusement	n. 娱乐
+embed	v. 嵌入
+rebellion	n. 叛乱
+critically	adv. 关键地、批判性地
+advantageous	adj. 有利的
+by-product	n. 副产品 （= 在生产主产品的时候附带产生的东西）
+incredible	adj. 难以置信的
+medal	n. 奖章
+sensory	adj. 感官的
+insist	v. 坚持（认为）
+vacuum	n. 真空
+unjust	adj. 不公正的
+drug	n. 药
+part-time	adj. 兼职的
+gem	n. 宝石
+potent	adj. 强有力的
+contradictory	adj. 相互矛盾的
+plug	v. 塞上 n. 插座
+humanity	n. 人类
+frigid	adj. 极冷的
+citizenship	n. 公民身份
+symbolism	n. 象征（手法、意义）
+unreliable	adj. 不可靠的
+recommend	v. 建议
+beast	n. 野兽
+resemblance	n. 相似
+skeptical	adj. 怀疑的
+possession	n. 拥有（物）
+invariably	adv. 不变地
+sulfur	n. 硫
+deception	n. 欺骗
+startle	v. 使受惊
+optimal	adj. 最佳的
+capability	n. 能力
+leisure	n. 悠闲
+essence	n. 本质、要素
+undesirable	adj. 不合意的
+elegant	adj. 精妙的
+self-sufficient	adj. 自给自足的
+submerge	v.（使）淹没
+demise	n. 死亡
+nomadic	adj. 游牧的
+merge	v. 合并
+seashore	n. 海岸边
+lengthen	v. 加长
+maturity	n. 成熟
+amendment	n. 修正（案）
+impurity	n. 杂质
+formidable	adj. 令人敬畏的
+unaltered	adj. 未（曾）改变的
+plunge	v. 俯冲、突然陷入
+abolish	v. 废除（一种法律制度、习俗）
+acknowledge	v. 承认
+ambiguity	n. 模棱两可
+catalog	v. 登记 (= 把东西记载下来编成目录）
+choir	n. 合唱团
+coerce	v. 胁迫
+collaborate	v. 合作
+commute	n. 通勤（=在两地之间乘车往返）
+compulsory	adj. 强制性的
+conducive	adj. 有益的
+constriction	n. 约束
+contrary	adj. 与……相反的
+counteract	v. 抵（抗、消）
+crime	n. 犯罪
+disguise	v. 掩盖
+echo	v. 发出回声、附和 n. 回声
+extrinsic	adj. 外部的
+federal	adj. 联邦的
+frustrate	v. 使挫败
+genre	n. （文学、艺术等的）种类、体裁
+gigantic	adj. 巨大的
+legitimate	adj. 合法的、合适的
+mentor	n. 导师
+recede	v. 后退
+rehearsal	n. 排练
+residue	n. 残留物
+sovereign	n. 主宰
+standpoint	n. 观点
+statistics	n. 统计数据
+straightforward	adj. 容易的、易懂的
+substantiate	v. 证实
+underestimate	v. 低估
+undermine	v. 破坏
+vague	adj. 含糊的
+victim	n. 受害者
+violate	v. 违反
+accent	n. 口音、方言
+adventure	n. 冒险
+agenda	n. 日程、议题
+bustling	adj. 忙碌的
+champion	v. 拥护 n. 冠军
+clip	v. 剪下
+compatible	adj. 相容的
+congregate	v.（使）聚集
+contend	v. 辩称、解决
+defect	n. 缺陷
+detrimental	adj. 有害的
+eager	adj. 热切的
+endeavor	n.&v. 努力、尝试
+eradicate	v. 根除
+escalate	v. 加剧
+excrete	v. 分泌
+fierce	adj. 激烈的
+fog	n. 雾
+hub	n. （商业、贸易）中心
+imagery	n. 意象
+kitchen	n. 厨房
+kneel	v. 下跪
+leather	n. 皮革
+multitude	n. 大量
+outdated	adj. 过时的
+praise	v. 称赞
+prerequisite	n. 先决条件
+pulse	n. 脉冲	n. 可食用的豆子
+rapport	n. 密切关系
+recital	n. 朗诵会
+redundancy	n. 多余、重复
+scenario	n. 情境
+shrink	v. （使）缩小
+skip	n.&v. 跳跃
+splendid	adj. 壮观的
+superficially	adv. 表面的
+supersede	v. 代替
+thesis	n. 论点
+thrill	n. 激动
+tough	adj. 坚硬的
+transparent	adj. 透明的
+treaty	n. 条约
+vice versa	反之亦然 （=反过来说也是行得通的）
+weird	adj. 奇怪的
+worthwhile	adj. 值得的
+abrasion	n. 磨损
+ashore	adj. 岸上的
+award	n.&v. 奖励
+awesome	adj. 令人印象深刻的
+bulletin	n. 公告
+burdensome	adj. 繁重的
+casual	adj. 休闲的、不经意的
+caution	n. 谨慎
+colossal	adj. 巨大的
+comeback	n. 重返
+complement	v. 补充
+conjunction	n. 联合
+constellation	n. 星座
+consult	v. 咨询
+counsel	n. 劝告 v. 提供建议
+county	n. 郡、县
+crush	v. 压碎
+cumulative	adj. 累积的
+declare	v. 宣称
+deficit	n. 不足
+deserve	v. 应得
+desolate	adj. 荒无人烟的
+destination	n. 目的地
+destiny	n. 命运
+disgust	n. & v. 厌恶
+elementary	adj. 基本的、元素的
+empathy	n. 同感能力
+endanger	v. 危害、使濒危
+flavor	n. 味道
+frankly	adv. 坦率地说
+garment	n. 服装
+genuine	adj. 真正的
+germ	n. 病菌
+glance	n. 瞥 （= 快速看一眼）
+gossip	n.&v. 闲聊
+heaven	n. 天堂
+hesitate	v. 迟疑
+holy	adj. 神圣的
+humble	adj. 简陋的、谦虚的
+humiliate	v. 使蒙羞
+immerse	v. 使专心于、沉浸于
+impersonate	v. 假扮
+improvise	v. 即兴表演
+increment	n. 增加量
+indispensable	adj. 必不可缺的
+innumerable	adj. 无数的
+label	n. 标签
+lavishly	adv. 奢华地
+legible	adj. 清晰可辨的
+livelihood	n. 生计
+lubricate	v. 润滑
+magnificent	adj. 壮丽的
+maneuver	v. 移动、操控
+mediocre	adj. 中庸的
+metaphor	n. 隐喻 （= 一种比喻修辞手法）
+mirage	n. 幻想、海市蜃楼
+obsession	n. 迷恋
+overtake	v. （在数量、重要性方面）超过
+overthrow	n.&v. 颠覆
+parade	n. 游行
+pavement	n. 路面
+pessimistic	adj. 悲观的
+pierce	v. 穿透
+piracy	n. 海盗行为
+ponder	v. 仔细思考
+rage	v. 肆虐（=迅速蔓延、激烈进行）、愤怒
+reply	n.&v. 回复
+rescue	v. 营救
+revenue	n. 收入
+ripe	adj. 成熟的
+ruthless	adj. 残忍的
+salary	n. 薪水
+satire	n. 讽刺
+scare	v. 惊吓
+scar	n. 伤疤
+secretary	n. 秘书、大臣
+showcase	n. 展示场合 v. （橱窗）展示
+spontaneously	adv. 自发地
+sporadic	adj. 偶尔发生的
+squander	v. 浪费
+standstill	n. 停止
+stuff	n. 东西
+subordinate	n. 下级
+swear	v. 发誓
+swirl	v. 盘旋
+symmetric	adj. 对称的
+testify	v. 证明
+thread	n. （棉、丝）线、线状物
+tongue	n. 舌头、语言
+trivial	adj. 微不足道的、无关紧要的
+update	v. 更新
+absurd	adj. 荒谬的
+aftermath	n. (事件等)结束后的一个时期
+alienate	v. 使疏远
+apology	n. 道歉
+automobile	n. 汽车
+bankruptcy	n. 破产
+battery	n. 群、组、电池
+beneficiary	n. 受益人
+betray	v. 泄漏
+bizarre	adj. 怪异的
+bleed	v. 流血
+brand	n. 品牌
+bravery	n. 勇敢
+brutal	adj. 残暴的
+chaotic	adj. 混乱的
+cherish	v. 珍爱
+clumsy	adj. 笨拙的
+coherent	adj. 连贯的
+commemorate	v. 纪念
+condemn	v. 判（罪）
+conjecture	v. 推测
+consecutive	adj. 连贯的
+cosmopolitan	adj. 世界性的
+courage	n. 勇气
+cruelty	n. 残忍
+crusade	n. (长期而坚定的) 努力奋斗
+curator	n. （博物馆、美术馆的）馆长
+curse	n. 祸根（=引起不幸的根本原因）、诅咒
+daunting	adj. 使人畏缩的
+decent	adj. 像样的（穿着、行为举止、品德等）
+delight	n. 高兴
+despair	n. 绝望
+digitally	adv. 数码
+dilemma	n. 进退两难的局面
+disappointment	n. 失望
+discount	v. 不理会
+discriminate	v. 区分
+dull	adj. 沉闷的
+eccentric	adj. 古怪的
+emergency	n. 紧急
+empower	v. 授权给
+enliven	v. 使活跃
+exquisite	adj. 精美的
+extinguish	v. 消除
+fake	v.&n. 伪造
+fidelity	n. 忠诚
+foresightedness	n. 前瞻性
+garage	n. 车库
+garbage	n. 垃圾
+gesture	n. 手势、姿态
+greedy	adj. 贪婪的
+guilty	adj. 有过错的
+heritage	n. 遗产
+hug	v. 拥抱、紧靠着
+hygienic	adj. 卫生的
+impending	adj. 即将发生的
+implicitly	adv. 含蓄地
+innocence	n. 天真
+meantime	adv. 同时
+merit	n. 优点
+mingle	v. 混合
+monarchy	n. 君主制
+monstrous	adj. 巨大的
+municipal	adj. 市（政）的
+obedience	n. 服从
+offend	v. 冒犯
+omit	v. 遗漏
+overnight	adv. 在夜里
+painful	adj. 痛苦的
+panic	n. 恐慌
+patrol	v. 巡逻
+pretty	adv. 相当地
+prophecy	n. 预言
+prototype	n. 原型
+recipe	n. 食谱、方法
+ridiculous	adj. 荒谬的
+rob	v. 抢劫
+rubbish	n. 垃圾
+sanction	n. 批准
+solemn	adj. 庄严的
+succumb	v. 屈服
+suffice	v. 足够
+surrender	v. 投降
+tedious	adj. 乏味的
+trajectory	n. 轨迹
+traverse	v. 穿过
+treasure	n. 宝藏 v. 珍视
+uphold	v. 维护（法律、制度、原则等）
+vacation	n. 假期 v. 度假
+vivid	adj. 生动的
+withhold	v. 拒绝给（东西、想法或情感等）
+scope	n. 范围
+pore	n.（细、毛、气）孔
+`,
+};
+
+const BUILTIN_BOOK_NAMES = Object.keys(BUILTIN_RAW);
+
+/* 宽松拆分释义：与「导入词库」不同，内置词库保留释义里的英文注释
+   （如「（复数 strata）」「[stick to sth 粘住 sth]」，对拼写有提示价值） */
+function splitSensesLoose(text){
+  const out = [];
+  let cur = null;
+  const flush = () => {
+    if (cur){
+      const m = String(cur.meaning || '').trim();
+      if (cur.pos || m) out.push({pos: cur.pos || '', meaning: m});
+    }
+    cur = null;
+  };
+  for (const tok of String(text || '').split(/\s+/).filter(Boolean)){
+    const r = splitPosMeaning(tok);
+    if (r.matched){
+      flush();
+      cur = {pos: r.pos || '', meaning: r.meaning || ''};
+    } else if (cur){
+      cur.meaning = cur.meaning ? (cur.meaning + ' ' + tok) : tok;
+    } else {
+      cur = {pos: '', meaning: tok};
+    }
+  }
+  flush();
+  if (!out.length) out.push({pos: '', meaning: String(text || '').trim()});
+  return out;
+}
+
+/* 解析某本词汇书的全部词条（结果缓存，只解析一次） */
+const _bookCache = {};
+function getBookEntries(bookName){
+  if (_bookCache[bookName]) return _bookCache[bookName];
+  const raw = BUILTIN_RAW[bookName] || '';
+  const list = [];
+  for (const line of raw.split('\n')){
+    if (!line.trim()) continue;
+    const p = line.split('\t');
+    const w = (p[0] || '').trim();
+    if (!w) continue;
+    const entry = {word: w, senses: splitSensesLoose(p[1] || '')};
+    const adv = (p[2] || '').trim();
+    if (adv) entry.adv = adv;   // 拔高释义：只作提示显示，不参与批改
+    list.push(entry);
+  }
+  _bookCache[bookName] = list;
+  return list;
+}
+
+/* 取某本词汇书指定序号区间的词条（序号从 1 开始，含首含尾；同一次测试内按单词去重） */
+function getRangeEntries(bookName, from, to){
+  const all = getBookEntries(bookName);
+  const slice = all.slice(Math.max(0, from - 1), Math.min(all.length, to));
+  const seen = new Set(), out = [];
+  for (const e of slice){
+    const k = e.word.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(e);
+  }
+  return out;
+}
 const LS = {
   libs: 'wt_libraries', recs: 'wt_records', student: 'wt_last_student', pending: 'wt_pending', settings: 'wt_settings'
 };
@@ -1154,6 +5219,8 @@ function renderLibList(){
   box.innerHTML = html;
 }
 function useLib(i){
+  $('libSource').value = 'custom';   // 从自建词库启动，需把来源切回自建
+  refreshSourceUI();
   $('selLib').value = String(i);
   switchTab('test');
 }
@@ -1191,6 +5258,95 @@ function renderLibSelect(){
   const sel = $('selLib');
   sel.innerHTML = libraries.map((l,i)=>`<option value="${i}">${esc(l.name)}（${l.entries.length} 词）</option>`).join('') || '<option value="">— 暂无词库，请先导入 —</option>';
 }
+
+/* ---------- 内置词汇书：来源切换 + 按序号选范围 ---------- */
+function builtinMode(){ return $('libSource').value === 'builtin'; }
+
+function currentBookName(){
+  const v = $('selBook').value;
+  return BUILTIN_RAW[v] ? v : BUILTIN_BOOK_NAMES[0];
+}
+
+function rebuildBookSelect(){
+  $('selBook').innerHTML = BUILTIN_BOOK_NAMES.map(n=>
+    `<option value="${esc(n)}">${esc(n)}（${getBookEntries(n).length} 词）</option>`
+  ).join('');
+}
+
+// 分段快捷下拉：每 50 词一段 + 全部
+function rebuildSegOptions(){
+  const total = getBookEntries(currentBookName()).length;
+  const seg = $('segSel');
+  let html = '<option value="">自定义范围</option>';
+  for (let s = 1; s <= total; s += 50){
+    const e = Math.min(s + 49, total);
+    html += `<option value="${s}-${e}">第 ${s}–${e} 词</option>`;
+  }
+  html += `<option value="1-${total}">全部（第 1–${total} 词）</option>`;
+  const want = seg.value || `${$('rangeFrom').value}-${$('rangeTo').value}`;
+  seg.innerHTML = html;
+  seg.value = [...seg.options].some(o=>o.value===want) ? want : '';
+}
+
+// 归一化起止序号：非法值回退、上下限收敛、起 > 止 自动对调
+function clampRange(){
+  const total = getBookEntries(currentBookName()).length;
+  let from = parseInt($('rangeFrom').value, 10);
+  let to   = parseInt($('rangeTo').value, 10);
+  if (!isFinite(from) || from < 1) from = 1;
+  if (!isFinite(to)   || to   < 1) to = total;
+  from = Math.min(from, total);
+  to   = Math.min(to, total);
+  if (from > to){ const t = from; from = to; to = t; }
+  return {from, to, total};
+}
+
+function updateRangeInfo(syncCount){
+  const name = currentBookName();
+  const {from, to, total} = clampRange();
+  const n = getRangeEntries(name, from, to).length;
+  $('rangeInfo').innerHTML =
+    `当前范围：<b>${esc(name)}</b> 第 <b>${from}</b>–<b>${to}</b> 词，该范围共 <b>${n}</b> 个词条（全书 ${total} 词）` +
+    (n ? '' : `　<span class="bad">⚠ 该范围没有单词，请检查起止序号</span>`);
+  if (syncCount){
+    $('pickCount').value = String(n);
+    $('pickAll').checked = false;
+  }
+  return {name, from, to, total, n};
+}
+
+function refreshSourceUI(){
+  const isB = builtinMode();
+  $('wrapBook').style.display  = isB ? '' : 'none';
+  $('wrapLib').style.display   = isB ? 'none' : '';
+  $('rangeBox').style.display  = isB ? '' : 'none';
+  $('pickAllTxt').textContent  = isB ? '全部（整个范围）' : '全部单词';
+  if (isB) updateRangeInfo(false);
+}
+
+$('libSource').onchange = () => { refreshSourceUI(); saveSettings(); };
+$('selBook').onchange = () => {
+  const total = getBookEntries(currentBookName()).length;
+  $('rangeFrom').value = '1';
+  $('rangeTo').value   = String(Math.min(50, total));
+  rebuildSegOptions();
+  updateRangeInfo(true);
+  saveSettings();
+};
+$('segSel').onchange = () => {
+  const v = $('segSel').value;
+  if (!v) return;                       // 自定义：不改动输入框
+  const [a, b] = v.split('-');
+  $('rangeFrom').value = a;
+  $('rangeTo').value   = b;
+  updateRangeInfo(true);
+  saveSettings();
+};
+$('rangeFrom').oninput  = () => { $('segSel').value = ''; updateRangeInfo(false); };
+$('rangeTo').oninput    = () => { $('segSel').value = ''; updateRangeInfo(false); };
+$('rangeFrom').onchange = () => { updateRangeInfo(true); saveSettings(); };
+$('rangeTo').onchange   = () => { updateRangeInfo(true); saveSettings(); };
+
 function renderStudentList(){
   const names = [...new Set(records.map(r=>r.student).filter(Boolean))];
   $('studentList').innerHTML = names.map(n=>`<option value="${esc(n)}">`).join('');
@@ -1212,7 +5368,11 @@ function saveSettings(){
     timeLimit: $('timeLimit').value,
     senseShow: $('senseShow').value,
     extEnabled: !!$('extToggle').checked,
-    student: $('studentName').value
+    student: $('studentName').value,
+    libSource: $('libSource').value,
+    book: $('selBook').value,
+    rangeFrom: $('rangeFrom').value,
+    rangeTo: $('rangeTo').value
   }));
 }
 function loadSettings(){
@@ -1229,22 +5389,35 @@ function loadSettings(){
     if (s.senseShow) $('senseShow').value = s.senseShow;
     if (s.extEnabled) $('extToggle').checked = true;
     if (s.student) $('studentName').value = s.student;
+    if (s.libSource === 'custom' || s.libSource === 'builtin') $('libSource').value = s.libSource;
+    if (s.book && BUILTIN_RAW[s.book]) $('selBook').value = s.book;
+    if (s.rangeFrom) $('rangeFrom').value = s.rangeFrom;
+    if (s.rangeTo) $('rangeTo').value = s.rangeTo;
   }catch(e){}
 }
 
 $('startBtn').onclick = async () => {
-  const i = parseInt($('selLib').value,10);
-  if (isNaN(i) || !libraries[i]){ alert('请先在「① 词库」导入单词表，再选择词库。'); switchTab('lib'); return; }
-  const lib = libraries[i];
+  // ① 取词池：内置词汇书按序号范围切，或自建词库整本
+  let lib;
+  if (builtinMode()){
+    const info = updateRangeInfo(false);
+    const entries = getRangeEntries(info.name, info.from, info.to);
+    if (!entries.length){ alert('所选范围没有单词，请检查起始/结束序号。'); return; }
+    lib = {name: `${info.name} 第${info.from}–${info.to}词`, entries};
+  } else {
+    const i = parseInt($('selLib').value,10);
+    if (isNaN(i) || !libraries[i]){ alert('请先在「词库」页粘贴导入单词表，再选择词库；或把「词库来源」改为内置词汇书。'); switchTab('lib'); return; }
+    lib = libraries[i];
+  }
   const student = $('studentName').value.trim();
   if (!student){ alert('请填写学生姓名（用于错词归档）。'); return; }
-  // 抽取数量：勾选「全部单词」则抽词库全部
-  const count = $('pickAll').checked
-    ? lib.entries.length
-    : Math.max(1, Math.min(1000, parseInt($('pickCount').value,10) || 50));
-  if (count > lib.entries.length && !$('pickAll').checked){
-    $('testWarn').textContent = `词库只有 ${lib.entries.length} 词，将全部抽取。`;
-  } else $('testWarn').textContent = '';
+  // ② 抽取数量：勾选「全部」则抽满整个词池
+  const pool = lib.entries.length;
+  const reqCount = parseInt($('pickCount').value,10) || 50;
+  const count = $('pickAll').checked ? pool : Math.max(1, Math.min(pool, reqCount));
+  $('testWarn').textContent = (!$('pickAll').checked && reqCount > pool)
+    ? `所选词池只有 ${pool} 词，本次将全部抽取。`
+    : '';
   const hintMode = $('hintMode').value;
   const matchMode = $('matchMode').value;
   const timeLimit = parseInt($('timeLimit').value,10) || 0;
@@ -1310,6 +5483,13 @@ function startTimer(){
   tick();
   examTimer = setInterval(tick, 1000);
 }
+/* 拔高释义提示：只有内置词汇书的部分词条带此字段；仅作提示展示，不参与批改 */
+function advHintHTML(entry){
+  const a = entry && entry.adv ? String(entry.adv).trim() : '';
+  if (!a) return '';
+  return `<span class="adv-hint"><span class="adv-tag">拔高释义</span><span class="adv-val">${esc(a)}</span></span>`;
+}
+
 function renderQuestion(){
   const q = session.questions[session.idx];
   const n = session.questions.length;
@@ -1323,13 +5503,13 @@ function renderQuestion(){
     const list = session.showAll
       ? q.entry.senses.map(s=>`${esc(s.pos||'')} ${esc(s.meaning||'')}`).join('　｜　')
       : '';
-    $('qAsk').innerHTML = session.showAll
+    $('qAsk').innerHTML = (session.showAll
       ? `该词所有词性与释义如下，请在空格上补全完整拼写：<br><b>${list}</b>`
-      : `请在空格上补全该单词的完整拼写：<br><b>${esc(q.asked.pos||'')} ${esc(q.asked.meaning||'')}</b>`;
+      : `请在空格上补全该单词的完整拼写：<br><b>${esc(q.asked.pos||'')} ${esc(q.asked.meaning||'')}</b>`) + advHintHTML(q.entry);
     $('lblOther').style.display = 'none';
     $('inOther').style.display = 'none';
   } else {
-    $('qAsk').innerHTML = `请补全拼写，并写出其余词性与释义。<br>当前提示项：<b>${esc(q.asked.pos||'')} ${esc(q.asked.meaning||'')}</b>`;
+    $('qAsk').innerHTML = `请补全拼写，并写出其余词性与释义。<br>当前提示项：<b>${esc(q.asked.pos||'')} ${esc(q.asked.meaning||'')}</b>` + advHintHTML(q.entry);
     $('lblOther').style.display = '';
     $('inOther').style.display = '';
   }
@@ -1514,6 +5694,7 @@ function finishExam(silent){
     items: grading.map((r,idx)=>{
       const q = session.questions[idx];
       return {word:q.entry.word, hint:q.hint, asked:q.asked, answer:q.answer, entrySenses:q.entry.senses,
+              entryAdv:q.entry.adv || '',
               spellingOk:r.g.spellingOk, senses:r.g.senseResults.map(s=>({pos:s.sense.pos, meaning:s.sense.meaning, ok:s.ok, errorType:s.errorType})),
               exts: (r.g.extResults||[]).map(e=>({label:e.label, word:e.word, ok:e.ok})), wrong:r.isWrong};
     })
@@ -1693,7 +5874,9 @@ function collectWrongEntries(st, recIdx){
       const k = String(it.word||'').toLowerCase();
       if (!k || seen.has(k)) return;
       const senses = fullSenses(it).map(s=>({pos:s.pos||'', meaning:s.meaning||''})).filter(s=>s.meaning || s.pos);
-      out.push({word: it.word, senses: senses.length ? senses : [{pos:'', meaning:''}]});
+      const entry = {word: it.word, senses: senses.length ? senses : [{pos:'', meaning:''}]};
+      if (it.entryAdv) entry.adv = it.entryAdv;   // 保留拔高释义，二次测试时仍能显示提示
+      out.push(entry);
       seen.add(k);
     });
   });
@@ -1710,6 +5893,8 @@ function importWrongToLib(st, recIdx){
   libraries.push(lib);
   localStorage.setItem(LS.libs, JSON.stringify(libraries));
   renderLibList(); renderLibSelect();
+  $('libSource').value = 'custom';   // 错词库属于自建词库，来源需切回自建
+  refreshSourceUI();
   if ($('selLib')) $('selLib').value = String(libraries.length-1); // 自动选中新词库
   const scope = (recIdx !== undefined && recIdx !== null) ? '本次测试的' : '该学生全部';
   alert(`✅ 已将${scope}错词 ${entries.length} 个导入新词库「${name}」\n\n已自动选中该词库，确认学生姓名后即可开始错词二次测试（可自由设置抽词数、限时、扩展词等）。`);
@@ -1976,10 +6161,14 @@ $('inOther').addEventListener('keydown', e=>{
 });
 
 /* ---------- 初始化 ---------- */
+rebuildBookSelect();   // 先填充词汇书下拉，loadSettings 才能恢复上次选中项
 renderLibSelect();
 renderLibList();
 renderStudentList();
-loadSettings(); // 恢复上次测试的设置
+loadSettings();        // 恢复上次测试的设置
+rebuildSegOptions();   // 依据已恢复的词汇书与范围生成分段快捷项
+refreshSourceUI();     // 依据「词库来源」显示/隐藏范围选择区
+updateRangeInfo(false);
 
 // 恢复未完成的测试进度
 (function(){
