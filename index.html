@@ -256,6 +256,10 @@ tr:hover td{background:rgba(212,175,55,.05)}
 .wt-arrow{display:inline-block;font-size:9px;color:var(--gold);margin-right:7px;transition:.15s}
 .wrun[open] > summary .wt-arrow{transform:rotate(90deg)}
 .wrun > summary .wt-acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.wrun > summary .wt-title{display:flex;flex-direction:column;gap:3px;min-width:0}
+.wt-time{font-size:11.5px;color:var(--text2);padding-left:16px;word-break:break-word}
+.wt-time b{color:var(--text);font-weight:700}
+.wt-time b.gold-text{color:var(--gold2)}
 .wrun > table.wrong-table{margin:2px 0 12px}
 
 /* ---- 测试页：当前词库状态条 ---- */
@@ -310,6 +314,16 @@ footer code{color:var(--gold2)}
 .ext-input.bad{border-color:var(--bad);color:var(--bad);background:rgba(224,108,90,.08)}
 .exam-tip{margin-top:12px;text-align:center;font-size:12.5px;color:var(--text2);opacity:.85}
 .exam-tip b{color:var(--gold2);background:rgba(212,175,55,.12);border-radius:5px;padding:1px 7px;font-family:Georgia,serif}
+
+/* ---- 结果页：开始 / 结束 / 总用时 ---- */
+.time-bar{
+  display:flex;gap:6px 18px;flex-wrap:wrap;align-items:center;
+  background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+  padding:8px 12px;margin-bottom:12px;font-size:12px;color:var(--text2);
+}
+.time-bar span{display:inline-flex;align-items:baseline;gap:6px;white-space:nowrap}
+.time-bar b{color:var(--text);font-weight:700;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+.time-bar b.gold-text{color:var(--gold2)}
 
 /* ---- 结果 ---- */
 .wrong-table td{font-size:12.5px}
@@ -5872,9 +5886,12 @@ function finishExam(silent){
   const unanswered = session.questions.filter(q=>!q.answer || (!q.answer.spelling.trim() && !q.answer.other.trim())).length;
   if (!silent && unanswered && !confirm(`还有 ${unanswered} 题未作答（将记为错误），确定交卷？`)) return;
   const gradingItems = gradeSession(session, $('wrongRule').value);
-  const duration = Math.round((Date.now()-session.startTime)/1000);
+  const endTime = Date.now();
+  const startTime = session.startTime || endTime;
+  const duration = Math.max(0, Math.round((endTime - startTime)/1000));   // 总用时（秒）
   records.push({
-    student: session.student, libName: session.libName, date: Date.now(), duration,
+    student: session.student, libName: session.libName,
+    startTime, endTime, date: endTime, duration,                            // date 保留兼容旧代码/旧数据
     wrongRule: $('wrongRule').value,
     items: gradingItems.map((r,idx)=>{
       const q = session.questions[idx];
@@ -5902,6 +5919,36 @@ $('submitBtn').onclick = () => {
 };
 
 /* ---------- 结果 ---------- */
+/* ---------- 时间显示与「开始 / 结束 / 总用时」口径 ---------- */
+const pad2 = n => String(n).padStart(2,'0');
+/* 时间戳 → 「2026-11-14 11:24:03」 */
+function fmtDT(ts){
+  const d = new Date(Number(ts) || Date.now());
+  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+}
+/* 起止时间 → 同一天时省略后半段的日期：「2026-11-14 11:24:03 → 11:24:31」 */
+function fmtRange(start, end){
+  const a = new Date(Number(start) || Date.now()), b = new Date(Number(end) || Date.now());
+  const sameDay = a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+  return sameDay
+    ? `${fmtDT(start)} → ${pad2(b.getHours())}:${pad2(b.getMinutes())}:${pad2(b.getSeconds())}`
+    : `${fmtDT(start)} → ${fmtDT(end)}`;
+}
+/* 秒数 → 「3 分 12 秒」 */
+function fmtDur(sec){
+  sec = Math.max(0, Math.round(Number(sec) || 0));
+  const h = Math.floor(sec/3600), m = Math.floor(sec%3600/60), s = sec%60;
+  if (h) return `${h} 时 ${m} 分 ${s} 秒`;
+  if (m) return s ? `${m} 分 ${s} 秒` : `${m} 分`;
+  return `${s} 秒`;
+}
+/* 一条记录的开始 / 结束 / 总用时（秒）；旧记录没有 startTime 时用 date - duration 反推 */
+function recTimes(rec){
+  const end = Number(rec.endTime) || Number(rec.date) || Date.now();
+  let start = Number(rec.startTime);
+  if (!start || start > end) start = end - (Number(rec.duration) || 0) * 1000;
+  return { start, end, dur: Math.max(0, Math.round((end - start)/1000)) };
+}
 function renderResult(){
   renderWrongBook();
   if (Array.isArray(grading)) grading = { items: grading };   // 兼容：批改结果数组 → 结果页结构
@@ -5935,9 +5982,11 @@ function renderLastResult(){
   const wrongItems = items.filter(i=>i.isWrong);
   const pct = items.length ? Math.round(correctCount/items.length*100) : 0;
   const lb = isRec ? g.rec.libName : session.libName;
-  const dt = isRec ? new Date(g.rec.date) : new Date();
-  const dur = isRec ? g.rec.duration : Math.round((Date.now()-session.startTime)/1000);
-  const dateStr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+  // 时间口径：开始时间 / 结束时间 / 总用时（历史记录用记录里的，刚交卷的用本次 session）
+  const tm = isRec
+    ? recTimes(g.rec)
+    : { start: session.startTime || Date.now(), end: Date.now(), dur: Math.round((Date.now()-(session.startTime||Date.now()))/1000) };
+  const dur = tm.dur;
 
   let html = `<div class="card">
     <h2>本次测试成绩 ${isRec?'（历史记录）':'（刚刚完成）'}</h2>
@@ -5947,9 +5996,14 @@ function renderLastResult(){
       <div class="stat"><div class="num">${spOk}/${spTotal}</div><div class="lbl">拼写正确</div></div>
       <div class="stat"><div class="num">${senseOk}/${senseTotal}</div><div class="lbl">释义正确</div></div>
       ${extTotal ? `<div class="stat"><div class="num">${extOk}/${extTotal}</div><div class="lbl">扩展词正确</div></div>` : ''}
-      <div class="stat"><div class="num">${dur}s</div><div class="lbl">用时</div></div>
+      <div class="stat"><div class="num">${dur}s</div><div class="lbl">总用时</div></div>
     </div>
-    <div class="muted" style="font-size:12px;margin-bottom:12px">词库：<b class="gold-text">${esc(lb)}</b> ｜ ${dateStr} ｜ 错词 <b class="bad">${wrongItems.length}</b> 个</div>
+    <div class="muted" style="font-size:12px;margin-bottom:10px">词库：<b class="gold-text">${esc(lb)}</b> ｜ 错词 <b class="bad">${wrongItems.length}</b> 个</div>
+    <div class="time-bar" id="timeBar">
+      <span>🟢 开始 <b>${fmtDT(tm.start)}</b></span>
+      <span>🔴 结束 <b>${fmtDT(tm.end)}</b></span>
+      <span>⏱ 总用时 <b class="gold-text">${fmtDur(tm.dur)}</b></span>
+    </div>
     <table class="wrong-table"><tr><th>#</th><th>单词</th><th>提示</th><th>拼写</th><th>其余词性释义</th><th>扩展词</th><th>结果</th><th>正确答案</th></tr>`;
   items.forEach((it,i)=>{
     const q = it.q;
@@ -5982,7 +6036,7 @@ function renderLastResult(){
       openExam();
     };
   }
-  $('exportBtn').onclick = () => exportCSV(items, lb);
+  $('exportBtn').onclick = () => exportCSV(items, lb, tm);
   if ($('redoBtn')) $('redoBtn').onclick = () => { grading = null; switchTab('test'); };
 }
 
@@ -6007,13 +6061,15 @@ function renderWrongBook(){
   </div>`;
 
   runs.forEach(run => {
-    const d = new Date(run.rec.date);
-    const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-    // 每次测试一个可折叠区块：summary 一行显示次数/时间/词库/错词数 + 操作按钮，默认收起
+    const t = recTimes(run.rec);
+    // 每次测试一个可折叠区块：summary 两行 —— ① 次数/词库/错词数 ② 开始 → 结束 · 总用时
     html += `<details class="wrun">
       <summary>
-        <span class="wt-title"><i class="wt-arrow">▶</i><b class="gold-text">第 ${run.idx+1} 次测试</b>
-          <span class="muted">· 🕐 ${ds} · ${esc(run.rec.libName||'—')} · 错词 <b class="bad">${run.wrong.length}</b>/${(run.rec.items||[]).length}</span>
+        <span class="wt-title">
+          <span class="wt-main"><i class="wt-arrow">▶</i><b class="gold-text">第 ${run.idx+1} 次测试</b>
+            <span class="muted">· ${esc(run.rec.libName||'—')} · 错词 <b class="bad">${run.wrong.length}</b>/${(run.rec.items||[]).length}</span>
+          </span>
+          <span class="wt-time">🕐 开始 <b>${fmtDT(t.start)}</b> → 结束 <b>${fmtDT(t.end)}</b> · 总用时 <b class="gold-text">${fmtDur(t.dur)}</b></span>
         </span>
         <span class="wt-acts">
           <button class="btn sm" onclick="event.stopPropagation();importWrongToLib(${run.idx})">📥 导入本次错词到词库</button>
@@ -6061,8 +6117,8 @@ function renderWrongBook(){
 function delOneRecord(recIdx){
   const r = records[recIdx];
   if (!r) return;
-  const dstr = new Date(r.date).toLocaleString('zh-CN');
-  if (!confirm(`确定删除「第 ${recIdx+1} 次测试（${dstr}）」的记录？此操作不可恢复。`)) return;
+  const t = recTimes(r);
+  if (!confirm(`确定删除「第 ${recIdx+1} 次测试（${fmtRange(t.start, t.end)}，总用时 ${fmtDur(t.dur)}）」的记录？此操作不可恢复。`)) return;
   records.splice(recIdx, 1);
   localStorage.setItem(LS.recs, JSON.stringify(records));
   grading = null;
@@ -6091,7 +6147,8 @@ function importWrongToLib(recIdx){
   const single = (recIdx !== undefined && recIdx !== null);
   const entries = collectWrongEntries(recIdx);
   if (!entries.length){ alert('该范围内没有错词可导入。'); return; }
-  const d = (single && records[recIdx]) ? new Date(records[recIdx].date) : new Date();
+  // 词库名用「开始时间」：跨零点交卷的测试仍归到开始那天
+  const d = new Date((single && records[recIdx]) ? recTimes(records[recIdx]).start : Date.now());
   const pad = n => String(n).padStart(2,'0');
   const datePart = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
   const timePart = single ? `_${pad(d.getHours())}${pad(d.getMinutes())}` : '';
@@ -6189,9 +6246,13 @@ function exportAllLibsCSV(){
   downloadCSV(`全部词库_${stamp()}.csv`, rows);
 }
 
-function exportCSV(items, lb){
-  const rows = [['日期','词库','单词','字母数','提示','提问词性','提问释义','学生拼写','拼写正确','其余词性释义(标准)','其余词性释义(学生)','扩展词(正确)','扩展词(学生)','每题全对','是否错词']];
-  const stamp = new Date().toLocaleString('zh-CN');
+function exportCSV(items, lb, tm){
+  // tm：{start,end,dur}；未传时用当前 session 兜底
+  if (!tm){
+    const end = Date.now(), start = (session && session.startTime) || end;
+    tm = { start, end, dur: Math.round((end-start)/1000) };
+  }
+  const rows = [['开始时间','结束时间','总用时(秒)','词库','单词','字母数','提示','提问词性','提问释义','学生拼写','拼写正确','其余词性释义(标准)','其余词性释义(学生)','扩展词(正确)','扩展词(学生)','每题全对','是否错词']];
   (items||[]).forEach((it,idx)=>{
     const q = it.q;
     const std = it.g.senseResults.length
@@ -6200,11 +6261,11 @@ function exportCSV(items, lb){
     const stu = (q.answer&&q.answer.other)||'';
     const extStd = (q.exts||[]).map(e=>e.word).join('; ');
     const extStu = ((q.answer&&q.answer.exts)||[]).join('; ');
-    rows.push([stamp, lb, q.entry.word, countLetters(q.entry.word), q.hint,
+    rows.push([fmtDT(tm.start), fmtDT(tm.end), tm.dur, lb, q.entry.word, countLetters(q.entry.word), q.hint,
       q.asked.pos, q.asked.meaning, (q.answer&&q.answer.spelling)||'', it.g.spellingOk?'对':'错',
       std, stu, extStd, extStu, it.isWrong?'否':'是', it.isWrong?'错词':'正确']);
   });
-  downloadCSV(`单词测试_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'')}.csv`, rows);
+  downloadCSV(`单词测试_${fmtDT(tm.start).replace(/[-: ]/g,'')}.csv`, rows);
 }
 /* 从测试记录恢复该词的完整词性释义（兼容新记录 entrySenses 与旧记录 asked+senses） */
 function fullSenses(it){
@@ -6218,11 +6279,11 @@ function sensesText(it, sep){
 }
 /* 导出全部错词 CSV（按测试次数逐条列出） */
 function exportWrongCSV(){
-  const rows = [['测试序号','测试日期','词库','单词','词性释义（完整）','错误详情']];
+  const rows = [['测试序号','开始时间','结束时间','总用时(秒)','词库','单词','词性释义（完整）','错误详情']];
   records.forEach((r,idx)=>{
-    const d = new Date(r.date).toLocaleString('zh-CN');
+    const t = recTimes(r);
     (r.items||[]).filter(i=>i.wrong).forEach(w=>{
-      rows.push([`第 ${idx+1} 次`, d, r.libName||'', w.word, sensesText(w, '；'), buildErrorDetail(w) || '—']);
+      rows.push([`第 ${idx+1} 次`, fmtDT(t.start), fmtDT(t.end), t.dur, r.libName||'', w.word, sensesText(w, '；'), buildErrorDetail(w) || '—']);
     });
   });
   downloadCSV(`错词本_全部_${new Date().toISOString().slice(0,10)}.csv`, rows);
@@ -6231,12 +6292,11 @@ function exportWrongCSV(){
 function exportWrongCSVOnce(recIdx){
   const r = records[recIdx];
   if (!r) return;
-  const rows = [['测试序号','测试日期','词库','单词','词性释义（完整）','错误详情']];
-  const d = new Date(r.date);
-  const dstr = d.toLocaleString('zh-CN');
-  const stamp = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
+  const rows = [['测试序号','开始时间','结束时间','总用时(秒)','词库','单词','词性释义（完整）','错误详情']];
+  const t = recTimes(r);
+  const stamp = fmtDT(t.start).replace(/[-: ]/g,'');
   (r.items||[]).filter(i=>i.wrong).forEach(w=>{
-    rows.push([`第 ${recIdx+1} 次`, dstr, r.libName||'', w.word, sensesText(w, '；'), buildErrorDetail(w) || '—']);
+    rows.push([`第 ${recIdx+1} 次`, fmtDT(t.start), fmtDT(t.end), t.dur, r.libName||'', w.word, sensesText(w, '；'), buildErrorDetail(w) || '—']);
   });
   downloadCSV(`错词本_第${recIdx+1}次测试_${stamp}.csv`, rows);
 }
