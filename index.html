@@ -5353,6 +5353,7 @@ function switchTab(name){
   $('tab-'+name).classList.add('active');
   if (name==='result') renderResult();
   if (name==='test') renderPicked();
+  window.scrollTo(0, 0);          // 切页一律回到页面顶部
 }
 
 /* ---------- 测试准备 ---------- */
@@ -5882,12 +5883,12 @@ function finishExam(silent){
   saveAnswer();
   const unanswered = session.questions.filter(q=>!q.answer || (!q.answer.spelling.trim() && !q.answer.other.trim())).length;
   if (!silent && unanswered && !confirm(`还有 ${unanswered} 题未作答（将记为错误），确定交卷？`)) return;
-  grading = gradeSession(session, $('wrongRule').value);
+  const gradingItems = gradeSession(session, $('wrongRule').value);
   const duration = Math.round((Date.now()-session.startTime)/1000);
   records.push({
     student: session.student, libName: session.libName, date: Date.now(), duration,
     wrongRule: $('wrongRule').value,
-    items: grading.map((r,idx)=>{
+    items: gradingItems.map((r,idx)=>{
       const q = session.questions[idx];
       return {word:q.entry.word, hint:q.hint, asked:q.asked, answer:q.answer, entrySenses:q.entry.senses,
               entryAdv:q.entry.adv || '',
@@ -5898,6 +5899,8 @@ function finishExam(silent){
   localStorage.setItem(LS.recs, JSON.stringify(records));
   localStorage.removeItem(LS.pending); // 测试完成，清除已保存进度
   $('examOverlay').classList.add('hidden');
+  // 交卷后自动跳到「③ 结果与错词」页（grading 用 {items} 结构供结果页渲染）
+  grading = { items: gradingItems };
   switchTab('result');
 }
 $('directSubmitBtn').onclick = () => finishExam(false);
@@ -5913,11 +5916,12 @@ $('submitBtn').onclick = () => {
 /* ---------- 结果 ---------- */
 function renderResult(){
   renderWrongBook();
+  if (Array.isArray(grading)) grading = { items: grading };   // 兼容：批改结果数组 → 结果页结构
   if (!grading && records.length){
     // 默认展示最近一次记录
     grading = buildGradingFromRecord(records[records.length-1]);
   }
-  if (!grading){ $('lastResult').innerHTML = '<div class="empty">还没有测试记录。完成一次测试后，成绩和错词会显示在这里。</div>'; return; }
+  if (!grading || !grading.items){ $('lastResult').innerHTML = '<div class="empty">还没有测试记录。完成一次测试后，成绩和错词会显示在这里。</div>'; return; }
   renderLastResult();
 }
 function buildGradingFromRecord(rec){
