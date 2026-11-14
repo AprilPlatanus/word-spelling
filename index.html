@@ -262,6 +262,23 @@ tr:hover td{background:rgba(212,175,55,.05)}
 .wt-time b.gold-text{color:var(--gold2)}
 .wrun > table.wrong-table{margin:2px 0 12px}
 
+/* ---- 结果页：本次答题明细 / 错词（可折叠） ---- */
+.res-fold{margin-top:2px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);overflow:hidden}
+.res-fold > summary{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  padding:11px 14px;cursor:pointer;list-style:none;font-size:13px;border-radius:12px;
+}
+.res-fold > summary::-webkit-details-marker{display:none}
+.res-fold > summary::marker{content:''}
+.res-fold > summary:hover{background:var(--panel)}
+.res-fold > summary:hover .rf-t{color:var(--gold2)}
+.rf-arrow{display:inline-block;font-size:9px;color:var(--gold);margin-right:7px;transition:.15s}
+.res-fold[open] > summary .rf-arrow{transform:rotate(90deg)}
+.res-fold[open] > summary{border-bottom:1px solid var(--line);border-radius:12px 12px 0 0}
+.res-fold > summary .rf-t{display:flex;align-items:center;flex-wrap:wrap;gap:6px;min-width:0}
+.rf-body{padding:2px 12px 12px;max-height:58vh;overflow:auto}
+.rf-body > table.wrong-table{margin:8px 0 4px}
+
 /* ---- 测试页：当前词库状态条 ---- */
 .picked-bar{
   display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
@@ -6004,6 +6021,14 @@ function renderLastResult(){
       <span>🔴 结束 <b>${fmtDT(tm.end)}</b></span>
       <span>⏱ 总用时 <b class="gold-text">${fmtDur(tm.dur)}</b></span>
     </div>
+    <details class="res-fold" id="resFold">
+      <summary>
+        <span class="rf-t"><i class="rf-arrow">▶</i><b>📋 本次答题明细</b>
+          <span class="muted">· 共 ${items.length} 词 · 错词 <b class="bad">${wrongItems.length}</b> 个 · 点击展开/收起</span>
+        </span>
+        <span class="muted" style="font-size:12px">逐题对错与正确答案</span>
+      </summary>
+      <div class="rf-body">
     <table class="wrong-table"><tr><th>#</th><th>单词</th><th>提示</th><th>拼写</th><th>其余词性释义</th><th>扩展词</th><th>结果</th><th>正确答案</th></tr>`;
   items.forEach((it,i)=>{
     const q = it.q;
@@ -6019,7 +6044,7 @@ function renderLastResult(){
     html += `<tr><td>${i+1}</td><td><b>${esc(q.entry.word)}</b></td><td class="muted" style="font-family:Georgia,serif;letter-spacing:2px">${esc(q.hint)}</td>
       <td>${spellTxt}</td><td>${senseTxt}</td><td>${extTxt}</td><td>${result}</td><td class="muted">${ansSenses}</td></tr>`;
   });
-  html += '</table>';
+  html += '</table></div></details>';
   html += `<div class="form-row" style="margin-top:14px" id="resultActions">
     ${isRec?'':`<button class="btn sm" id="retestWrongBtn">🔁 重测错词（${wrongItems.length}）</button>`}
     <button class="btn ghost sm" id="exportBtn">⬇️ 导出本次成绩 CSV</button>
