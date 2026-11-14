@@ -242,6 +242,9 @@ tr:hover td{background:rgba(212,175,55,.05)}
 .range-row .cnt b{color:var(--gold2);font-size:15px}
 .range-row select{width:auto;min-width:150px;flex:0 0 auto;padding:9px 11px;font-size:13px}
 
+/* ---- 错词本：按测试次数归档的区块 ---- */
+.wrun{border-top:1px dashed var(--line);padding-top:2px}
+
 /* ---- 测试页：当前词库状态条 ---- */
 .picked-bar{
   display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
@@ -393,7 +396,6 @@ footer code{color:var(--gold2)}
     </div>
   </div>
   <div class="header-right">
-    <span class="chip" id="studentChip">学生：未选择</span>
     <div class="tpick" id="themePicker" title="选择配色主题">
       <button data-theme="gold" style="background:linear-gradient(135deg,#f0d47a,#a8842c)" title="黑金"></button>
       <button data-theme="blue" style="background:linear-gradient(135deg,#8cc8ff,#2f7fe0)" title="星空蓝"></button>
@@ -503,11 +505,6 @@ footer code{color:var(--gold2)}
 
       <div class="form-grid">
         <div>
-          <label>学生姓名</label>
-          <input type="text" id="studentName" placeholder="例如：李小明" list="studentList">
-          <datalist id="studentList"></datalist>
-        </div>
-        <div>
           <label>抽取单词数量（不超过所选范围词数）</label>
           <div class="form-row" style="gap:8px">
             <input type="text" id="pickCount" value="50" placeholder="50" inputmode="numeric" style="flex:1;min-width:0">
@@ -516,8 +513,6 @@ footer code{color:var(--gold2)}
             </label>
           </div>
         </div>
-      </div>
-      <div class="form-grid">
         <div>
           <label>拼写提示策略</label>
           <select id="hintMode">
@@ -575,7 +570,7 @@ footer code{color:var(--gold2)}
         <summary>使用说明与测试规则 <span class="rb-tip"></span></summary>
         <div class="hint-box">
         <b>选词方式</b>：词库在 <b>「① 词库」页</b> 选定——内置词库挑好书、填好起止序号后点「载入词库」；
-        或用自己粘贴导入的自建词库点「使用」。载入后回到本页填写学生姓名、点「开始测试」才开考；本页只显示<b>当前测试词库</b>，可设置抽词数与答题规则。<br>
+        或用自己粘贴导入的自建词库点「使用」。载入后回到本页设置答题规则、点「开始测试」才开考；本页只显示<b>当前测试词库</b>，可设置抽词数与答题规则。<br>
         <b>抽取规则</b>：每次开始测试都会<b>重新随机打乱单词顺序</b>（勾选「全部」时同样打乱后测试，不会按词库原顺序出题）。<br>
         <b>释义提示</b>：内置词汇书答题时会同时显示 <b>基础释义</b> 与 <b>拔高释义</b>（拔高释义只在部分词条存在），
         两档释义都只作提示，<b>不参与批改</b>。<br>
@@ -599,14 +594,14 @@ footer code{color:var(--gold2)}
   <section id="tab-result" class="tab">
     <div id="lastResult"></div>
     <div class="card">
-      <h2>错词本（按学生归档）</h2>
+      <h2>错词本（按测试次数归档）</h2>
       <div id="wrongBook"></div>
     </div>
   </section>
 </main>
 
 <footer>
-  📌 <b>使用流程</b>：① 在「① 词库」页选词库——内置词库挑一本、填起止序号后点「载入词库」，或自建词库点「使用」→ ② 在「② 测试」页填写学生姓名与答题规则、点「开始测试」→ ③ 学生全屏答题 → ④ 交卷后自动批改，错词自动进入错词本，可一键导出 CSV，也可一键导入为错词库做二次测试。<br>
+  📌 <b>使用流程</b>：① 在「① 词库」页选词库——内置词库挑一本、填起止序号后点「载入词库」，或自建词库点「使用」→ ② 在「② 测试」页设置抽词数与答题规则、点「开始测试」→ ③ 全屏答题 → ④ 交卷后自动批改并跳到结果页，错词按测试次数归入错词本，可一键导出 CSV，也可一键导入为错词库做二次测试。<br>
   💾 所有数据保存在 <code>本机浏览器 localStorage</code>，不会上传；换浏览器或清除浏览器数据会丢失，请定期导出 CSV 备份。
 </footer>
 
@@ -5188,7 +5183,7 @@ function getRangeEntries(bookName, from, to){
   return out;
 }
 const LS = {
-  libs: 'wt_libraries', recs: 'wt_records', student: 'wt_last_student', pending: 'wt_pending', settings: 'wt_settings'
+  libs: 'wt_libraries', recs: 'wt_records', pending: 'wt_pending', settings: 'wt_settings'
 };
 /* 安全读取 localStorage：数据损坏/格式不对时回退为空，避免整页脚本崩溃打不开 */
 function lsJSON(key, fallback){
@@ -5523,11 +5518,7 @@ $('loadStartBtn').onclick = () => {
   if (!info.n){ alert('所选范围没有单词，请检查起始 / 结束序号。'); return; }
   saveSettings();
   switchTab('test');
-  const name = $('studentName').value.trim();
-  $('testWarn').textContent = name
-    ? `已载入「${info.name} 第${info.from}–${info.to}词」（${info.n} 词），点「开始测试」即可开考。`
-    : `已载入「${info.name} 第${info.from}–${info.to}词」（${info.n} 词），填写学生姓名后点「开始测试」。`;
-  if (!name) $('studentName').focus();
+  $('testWarn').textContent = `已载入「${info.name} 第${info.from}–${info.to}词」（${info.n} 词），点「开始测试」即可开考。`;
 };
 
 /* 内置词库面板折叠（记忆状态） */
@@ -5544,16 +5535,6 @@ $('builtinToggle').onclick = () => {
 };
 applyBuiltinOpen();
 
-function renderStudentList(){
-  const names = [...new Set(records.map(r=>r.student).filter(Boolean))];
-  $('studentList').innerHTML = names.map(n=>`<option value="${esc(n)}">`).join('');
-  const last = localStorage.getItem(LS.student);
-  if (last && !$('studentName').value) $('studentName').value = last;
-  const chip = last ? `学生：${esc(last)}` : '学生：未选择';
-  $('studentChip').textContent = '学生：未选择';
-  $('studentChip').innerHTML = last ? `学生：<b class="gold-text">${esc(last)}</b>` : '学生：未选择';
-}
-
 /* ---------- 测试设置记忆 ---------- */
 function saveSettings(){
   localStorage.setItem(LS.settings, JSON.stringify({
@@ -5565,7 +5546,6 @@ function saveSettings(){
     timeLimit: $('timeLimit').value,
     senseShow: $('senseShow').value,
     extEnabled: !!$('extToggle').checked,
-    student: $('studentName').value,
     libSource: $('libSource').value,
     book: $('selBook').value,
     rangeFrom: $('rangeFrom').value,
@@ -5585,7 +5565,6 @@ function loadSettings(){
     if (s.timeLimit !== undefined) $('timeLimit').value = String(s.timeLimit);
     if (s.senseShow) $('senseShow').value = s.senseShow;
     if (s.extEnabled) $('extToggle').checked = true;
-    if (s.student) $('studentName').value = s.student;
     if (s.libSource === 'custom' || s.libSource === 'builtin') $('libSource').value = s.libSource;
     if (s.book && BUILTIN_RAW[s.book]) $('selBook').value = s.book;
     if (s.rangeFrom) $('rangeFrom').value = s.rangeFrom;
@@ -5606,8 +5585,6 @@ $('startBtn').onclick = async () => {
     if (isNaN(i) || !libraries[i]){ alert('还没有可用的自建词库。请到「① 词库」页粘贴导入单词表，或直接使用内置词库。'); switchTab('lib'); return; }
     lib = libraries[i];
   }
-  const student = $('studentName').value.trim();
-  if (!student){ alert('请填写学生姓名（用于错词归档）。'); return; }
   // ② 抽取数量：勾选「全部」则抽满整个词池
   const pool = lib.entries.length;
   const reqCount = parseInt($('pickCount').value,10) || 50;
@@ -5620,14 +5597,12 @@ $('startBtn').onclick = async () => {
   const timeLimit = parseInt($('timeLimit').value,10) || 0;
   localStorage.removeItem(LS.pending); // 开始新测试，作废旧进度
   session = makeSession(lib, count, hintMode, null, matchMode, $('extToggle').checked);
-  session.student = student;
+  session.student = '';
   session.libName = lib.name;
   session.limit = timeLimit;         // 每题限时（秒），0 = 不限时
   session.showAll = $('senseShow').value === 'all'; // 全部显示词性释义（只考拼写）
   session.wrongRule = $('wrongRule').value;         // 判错标准
   fbPending = false;
-  localStorage.setItem(LS.student, student);
-  renderStudentList();
   saveSettings(); // 记住本次设置，下次测试自动恢复
   // 勾选扩展词：从在线词典自动匹配「词性转换」扩展词（网络失败/超时自动回退为规则结果）
   if ($('extToggle').checked){
@@ -5652,7 +5627,7 @@ function openExam(){
   grading = null;
   stopTimer();
   $('examOverlay').classList.remove('hidden');
-  $('exStudent').textContent = `${session.student} · ${session.libName}`;
+  $('exStudent').textContent = session.libName;
   renderQuestion();
 }
 function stopTimer(){
@@ -5854,7 +5829,7 @@ function restoreProgress(){
     const snap = JSON.parse(raw);
     if (!snap.questions || !snap.questions.length) return false;
     session = {
-      student: snap.student, libName: snap.libName,
+      student: snap.student || '', libName: snap.libName,
       limit: snap.limit, showAll: !!snap.showAll, wrongRule: snap.wrongRule || 'any',
       matchMode: snap.matchMode, hintMode: snap.hintMode,
       startTime: snap.startTime, idx: snap.idx,
@@ -5946,7 +5921,6 @@ function renderLastResult(){
   const correctCount = items.filter(i=>!i.isWrong).length;
   const wrongItems = items.filter(i=>i.isWrong);
   const pct = items.length ? Math.round(correctCount/items.length*100) : 0;
-  const st = isRec ? g.rec.student : session.student;
   const lb = isRec ? g.rec.libName : session.libName;
   const dt = isRec ? new Date(g.rec.date) : new Date();
   const dur = isRec ? g.rec.duration : Math.round((Date.now()-session.startTime)/1000);
@@ -5962,7 +5936,7 @@ function renderLastResult(){
       ${extTotal ? `<div class="stat"><div class="num">${extOk}/${extTotal}</div><div class="lbl">扩展词正确</div></div>` : ''}
       <div class="stat"><div class="num">${dur}s</div><div class="lbl">用时</div></div>
     </div>
-    <div class="muted" style="font-size:12px;margin-bottom:12px">学生：<b class="gold-text">${esc(st)}</b> ｜ 词库：${esc(lb)} ｜ ${dateStr} ｜ 错词 <b class="bad">${wrongItems.length}</b> 个</div>
+    <div class="muted" style="font-size:12px;margin-bottom:12px">词库：<b class="gold-text">${esc(lb)}</b> ｜ ${dateStr} ｜ 错词 <b class="bad">${wrongItems.length}</b> 个</div>
     <table class="wrong-table"><tr><th>#</th><th>单词</th><th>提示</th><th>拼写</th><th>其余词性释义</th><th>扩展词</th><th>结果</th><th>正确答案</th></tr>`;
   items.forEach((it,i)=>{
     const q = it.q;
@@ -5989,86 +5963,86 @@ function renderLastResult(){
   if (wrongItems.length && !isRec){
     $('retestWrongBtn').onclick = () => {
       const wrongEntries = wrongItems.map(it=>it.q.entry);
-      const fakeLib = {name: `${st} 错词重测`, entries: wrongEntries};
+      const fakeLib = {name: '错词重测', entries: wrongEntries};
       session = makeSession(fakeLib, wrongEntries.length, 'auto', null, 'loose');
-      session.student = st; session.libName = fakeLib.name;
+      session.student = ''; session.libName = fakeLib.name;
       openExam();
     };
   }
-  $('exportBtn').onclick = () => exportCSV(records.length ? records[records.length-1] : null, items, st, lb);
+  $('exportBtn').onclick = () => exportCSV(items, lb);
   if ($('redoBtn')) $('redoBtn').onclick = () => { grading = null; switchTab('test'); };
 }
 
 function renderWrongBook(){
   const box = $('wrongBook');
   if (!records.length){ box.innerHTML = '<div class="empty">暂无错词记录。测试交卷后，错词会自动归档到这里。</div>'; return; }
-  // 按学生分组
-  const byStudent = {};
-  [...records].reverse().forEach(r=>{
-    const w = r.items.filter(i=>i.wrong);
-    if (!w.length) return;
-    (byStudent[r.student] = byStudent[r.student]||[]).push({rec:r, wrong:w});
-  });
-  const names = Object.keys(byStudent);
-  if (!names.length){ box.innerHTML = '<div class="empty">暂无错词记录 🎉</div>'; return; }
-  let html = '';
-  for (const st of names){
-    const groups = byStudent[st];
-    const allWrong = groups.flatMap(g=>g.wrong);
-    html += `<div style="margin-bottom:20px">
-      <div class="form-row" style="justify-content:space-between;margin-bottom:8px">
-        <b class="gold-text">${esc(st)}</b>
-        <div class="form-row">
-          <span class="muted" style="font-size:12px">累计错词 ${allWrong.length} 个 · ${groups.length} 次测试</span>
-          <button class="btn sm" onclick="importWrongToLib('${escJs(st)}')">📥 全部错词导入词库</button>
-          <button class="btn ghost sm" onclick="exportWrongCSV('${escJs(st)}')">⬇️ 导出错词 CSV</button>
-          <button class="btn danger sm" onclick="delStudentRecords('${escJs(st)}')">清除该学生记录</button>
-        </div>
-      </div>`;
-    // 按测试时间分开显示：每次测试独立一个区块与错词表（时间从新到旧）
-    groups.forEach(g=>{
-      const d = new Date(g.rec.date);
-      const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-      const recIdx = records.indexOf(g.rec);
-      html += `<div style="margin:14px 0 6px;font-size:13px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
-        <span><b>🕐 ${ds}</b> <span class="muted">（本次错词 ${g.wrong.length} 个 · 共 ${g.rec.items.length} 词）</span></span>
+  // 按「测试次数」归档：每次测试一个区块（最近一次排在最上面），不再按学生分组
+  const runs = records
+    .map((rec, idx) => ({ rec, idx, wrong: (rec.items||[]).filter(i=>i.wrong) }))
+    .filter(run => run.wrong.length)
+    .reverse();
+  if (!runs.length){ box.innerHTML = '<div class="empty">暂无错词记录 🎉</div>'; return; }
+  const totalWrong = runs.reduce((a,r)=>a+r.wrong.length, 0);
+
+  let html = `<div class="form-row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+    <span class="muted" style="font-size:12px">共 <b class="gold-text">${records.length}</b> 次测试 · 有错词 <b class="gold-text">${runs.length}</b> 次 · 累计错词 <b class="bad">${totalWrong}</b> 个</span>
+    <span class="form-row">
+      <button class="btn sm" onclick="importWrongToLib()">📥 全部错词导入词库</button>
+      <button class="btn ghost sm" onclick="exportWrongCSV()">⬇️ 导出全部错词 CSV</button>
+    </span>
+  </div>`;
+
+  runs.forEach(run => {
+    const d = new Date(run.rec.date);
+    const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    html += `<div class="wrun">
+      <div class="form-row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin:12px 0 6px">
+        <span style="font-size:13px">
+          <b class="gold-text">第 ${run.idx+1} 次测试</b>
+          <span class="muted">· 🕐 ${ds} · ${esc(run.rec.libName||'—')} · 错词 <b class="bad">${run.wrong.length}</b>/${(run.rec.items||[]).length}</span>
+        </span>
         <span class="form-row">
-          <button class="btn sm" onclick="importWrongToLib('${escJs(st)}', ${recIdx})">📥 导入本次错词到词库</button>
-          <button class="btn ghost sm" onclick="exportWrongCSVOnce(${recIdx})">⬇️ 导出本次错词 CSV</button>
+          <button class="btn sm" onclick="importWrongToLib(${run.idx})">📥 导入本次错词到词库</button>
+          <button class="btn ghost sm" onclick="exportWrongCSVOnce(${run.idx})">⬇️ 导出本次错词 CSV</button>
+          <button class="btn danger sm" onclick="delOneRecord(${run.idx})">删除本次记录</button>
         </span>
       </div>
       <table class="wrong-table"><tr><th>单词</th><th>词性释义（完整）</th><th>拼写</th><th>错误详情</th></tr>`;
-      g.wrong.forEach(w=>{
-        const detail = buildErrorDetail(w);
-        html += `<tr><td><b>${esc(w.word)}</b></td><td class="muted">${esc(sensesText(w,'；'))}</td>
-          <td class="muted">${esc((w.answer&&w.answer.spelling)||'—')}</td>
-          <td class="bad">${esc(detail||'—')}</td></tr>`;
-      });
-      html += '</table>';
+    run.wrong.forEach(w=>{
+      const detail = buildErrorDetail(w);
+      html += `<tr><td><b>${esc(w.word)}</b></td><td class="muted">${esc(sensesText(w,'；'))}</td>
+        <td class="muted">${esc((w.answer&&w.answer.spelling)||'—')}</td>
+        <td class="bad">${esc(detail||'—')}</td></tr>`;
     });
-    html += '</div>';
-  }
+    html += '</table></div>';
+  });
+
   html += `<div class="form-row" style="justify-content:flex-end"><button class="btn danger sm" id="clearAllBtn">🗑 清空全部错词记录</button></div>`;
   box.innerHTML = html;
   $('clearAllBtn').onclick = () => {
-    if (!confirm('确定清空所有学生的错词记录？此操作不可恢复。')) return;
+    if (!confirm('确定清空全部测试记录与错词？此操作不可恢复。')) return;
     records = []; localStorage.setItem(LS.recs, JSON.stringify(records));
-    renderWrongBook(); renderStudentList();
+    grading = null;
+    renderResult();
   };
 }
-function delStudentRecords(st){
-  if (!confirm(`确定清除学生「${st}」的全部测试记录？`)) return;
-  records = records.filter(r=>r.student!==st);
+/* 删除某一次测试的记录（按测试次数归档后使用） */
+function delOneRecord(recIdx){
+  const r = records[recIdx];
+  if (!r) return;
+  const dstr = new Date(r.date).toLocaleString('zh-CN');
+  if (!confirm(`确定删除「第 ${recIdx+1} 次测试（${dstr}）」的记录？此操作不可恢复。`)) return;
+  records.splice(recIdx, 1);
   localStorage.setItem(LS.recs, JSON.stringify(records));
-  renderResult(); renderStudentList();
+  grading = null;
+  renderResult();
 }
 
 /* ---------- 错词一键导入词库（用于错词二次测试） ---------- */
-// 收集错词条目：recIdx 为指定某次测试，省略则取该学生全部错词；自动按单词去重
-function collectWrongEntries(st, recIdx){
+// 收集错词条目：recIdx 为指定某次测试，省略则取全部测试的错词；自动按单词去重
+function collectWrongEntries(recIdx){
   const out = [], seen = new Set();
   records.forEach((r,i)=>{
-    if (r.student !== st) return;
     if (recIdx !== undefined && recIdx !== null && i !== recIdx) return;
     (r.items||[]).filter(it=>it.wrong).forEach(it=>{
       const k = String(it.word||'').toLowerCase();
@@ -6082,13 +6056,16 @@ function collectWrongEntries(st, recIdx){
   });
   return out;
 }
-function importWrongToLib(st, recIdx){
-  const entries = collectWrongEntries(st, recIdx);
+function importWrongToLib(recIdx){
+  const single = (recIdx !== undefined && recIdx !== null);
+  const entries = collectWrongEntries(recIdx);
   if (!entries.length){ alert('该范围内没有错词可导入。'); return; }
-  const d = (recIdx !== undefined && recIdx !== null && records[recIdx]) ? new Date(records[recIdx].date) : new Date();
-  const datePart = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
-  let name = `错词库_${st}_${datePart}`, n = 2;
-  while (libraries.some(l=>l.name===name)) name = `错词库_${st}_${datePart}(${n++})`;
+  const d = (single && records[recIdx]) ? new Date(records[recIdx].date) : new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const datePart = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
+  const timePart = single ? `_${pad(d.getHours())}${pad(d.getMinutes())}` : '';
+  let name = `错词库_${datePart}${timePart}`, n = 2;
+  while (libraries.some(l=>l.name===name)) name = `错词库_${datePart}${timePart}(${n++})`;
   const lib = {id: Date.now().toString(36)+Math.random().toString(36).slice(2,6), name, entries, createdAt: Date.now(), count: entries.length};
   libraries.push(lib);
   localStorage.setItem(LS.libs, JSON.stringify(libraries));
@@ -6096,8 +6073,8 @@ function importWrongToLib(st, recIdx){
   $('libSource').value = 'custom';   // 错词库属于自建词库，来源需切回自建
   refreshSourceUI();
   if ($('selLib')) $('selLib').value = String(libraries.length-1); // 自动选中新词库
-  const scope = (recIdx !== undefined && recIdx !== null) ? '本次测试的' : '该学生全部';
-  alert(`✅ 已将${scope}错词 ${entries.length} 个导入新词库「${name}」\n\n已自动选中该词库，确认学生姓名后即可开始错词二次测试（可自由设置抽词数、限时、扩展词等）。`);
+  const scope = single ? `第 ${recIdx+1} 次测试的` : '全部测试的';
+  alert(`✅ 已将${scope}错词 ${entries.length} 个（去重后）导入新词库「${name}」\n\n已自动选中该词库，回到「② 测试」页点「开始测试」即可做错词二次测试（可自由设置抽词数、限时、扩展词等）。`);
   switchTab('test');
 }
 
@@ -6181,8 +6158,9 @@ function exportAllLibsCSV(){
   downloadCSV(`全部词库_${stamp()}.csv`, rows);
 }
 
-function exportCSV(rec, items, st, lb){
-  const rows = [['学生','日期','词库','单词','字母数','提示','提问词性','提问释义','学生拼写','拼写正确','其余词性释义(标准)','其余词性释义(学生)','扩展词(正确)','扩展词(学生)','每题全对','是否错词']];
+function exportCSV(items, lb){
+  const rows = [['日期','词库','单词','字母数','提示','提问词性','提问释义','学生拼写','拼写正确','其余词性释义(标准)','其余词性释义(学生)','扩展词(正确)','扩展词(学生)','每题全对','是否错词']];
+  const stamp = new Date().toLocaleString('zh-CN');
   (items||[]).forEach((it,idx)=>{
     const q = it.q;
     const std = it.g.senseResults.length
@@ -6191,11 +6169,11 @@ function exportCSV(rec, items, st, lb){
     const stu = (q.answer&&q.answer.other)||'';
     const extStd = (q.exts||[]).map(e=>e.word).join('; ');
     const extStu = ((q.answer&&q.answer.exts)||[]).join('; ');
-    rows.push([st, new Date().toLocaleString('zh-CN'), lb, q.entry.word, countLetters(q.entry.word), q.hint,
+    rows.push([stamp, lb, q.entry.word, countLetters(q.entry.word), q.hint,
       q.asked.pos, q.asked.meaning, (q.answer&&q.answer.spelling)||'', it.g.spellingOk?'对':'错',
       std, stu, extStd, extStu, it.isWrong?'否':'是', it.isWrong?'错词':'正确']);
   });
-  downloadCSV(`单词测试_${st}_${new Date().toISOString().slice(0,10)}.csv`, rows);
+  downloadCSV(`单词测试_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'')}.csv`, rows);
 }
 /* 从测试记录恢复该词的完整词性释义（兼容新记录 entrySenses 与旧记录 asked+senses） */
 function fullSenses(it){
@@ -6207,28 +6185,29 @@ function fullSenses(it){
 function sensesText(it, sep){
   return fullSenses(it).map(s=>`${s.pos||''} ${s.meaning||''}`.trim()).filter(Boolean).join(sep);
 }
-function exportWrongCSV(st){
-  const rows = [['学生','测试日期','单词','词性释义（完整）','错误详情']];
-  records.filter(r=>r.student===st).forEach(r=>{
+/* 导出全部错词 CSV（按测试次数逐条列出） */
+function exportWrongCSV(){
+  const rows = [['测试序号','测试日期','词库','单词','词性释义（完整）','错误详情']];
+  records.forEach((r,idx)=>{
     const d = new Date(r.date).toLocaleString('zh-CN');
-    r.items.filter(i=>i.wrong).forEach(w=>{
-      rows.push([st, d, w.word, sensesText(w, '；'), buildErrorDetail(w) || '—']);
+    (r.items||[]).filter(i=>i.wrong).forEach(w=>{
+      rows.push([`第 ${idx+1} 次`, d, r.libName||'', w.word, sensesText(w, '；'), buildErrorDetail(w) || '—']);
     });
   });
-  downloadCSV(`错词本_${st}_${new Date().toISOString().slice(0,10)}.csv`, rows);
+  downloadCSV(`错词本_全部_${new Date().toISOString().slice(0,10)}.csv`, rows);
 }
-/* 导出某一次测试的错词 CSV（错词本按时间分开后，单次测试独立导出） */
+/* 导出某一次测试的错词 CSV（错词本按测试次数分开后，单次测试独立导出） */
 function exportWrongCSVOnce(recIdx){
   const r = records[recIdx];
   if (!r) return;
-  const rows = [['学生','测试日期','单词','词性释义（完整）','错误详情']];
+  const rows = [['测试序号','测试日期','词库','单词','词性释义（完整）','错误详情']];
   const d = new Date(r.date);
   const dstr = d.toLocaleString('zh-CN');
-  r.items.filter(i=>i.wrong).forEach(w=>{
-    rows.push([r.student, dstr, w.word, sensesText(w, '；'), buildErrorDetail(w) || '—']);
-  });
   const stamp = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
-  downloadCSV(`错词本_${r.student}_${stamp}.csv`, rows);
+  (r.items||[]).filter(i=>i.wrong).forEach(w=>{
+    rows.push([`第 ${recIdx+1} 次`, dstr, r.libName||'', w.word, sensesText(w, '；'), buildErrorDetail(w) || '—']);
+  });
+  downloadCSV(`错词本_第${recIdx+1}次测试_${stamp}.csv`, rows);
 }
 
 /* ---------- 输入法锁定 ---------- */
@@ -6364,7 +6343,6 @@ $('inOther').addEventListener('keydown', e=>{
 rebuildBookSelect();   // 先填充词汇书下拉，loadSettings 才能恢复上次选中项
 renderLibSelect();
 renderLibList();
-renderStudentList();
 loadSettings();        // 恢复上次测试的设置
 rebuildSegOptions();   // 依据已恢复的词汇书与范围生成分段快捷项
 refreshSourceUI();     // 依据「词库来源」显示/隐藏范围选择区
@@ -6377,7 +6355,7 @@ updateRangeInfo(false);
   try{
     const snap = JSON.parse(raw);
     const saved = new Date(snap.savedAt).toLocaleString('zh-CN');
-    if (confirm(`检测到未完成的测试进度（${snap.student || '未填学生'} · 保存于 ${saved}），是否继续作答？\n\n点「确定」继续，点「取消」放弃该进度。`)){
+    if (confirm(`检测到未完成的测试进度（${snap.libName || '未命名词库'} · 保存于 ${saved}），是否继续作答？\n\n点「确定」继续，点「取消」放弃该进度。`)){
       if (restoreProgress()){
         switchTab('test');
         openExam();
