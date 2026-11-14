@@ -242,8 +242,21 @@ tr:hover td{background:rgba(212,175,55,.05)}
 .range-row .cnt b{color:var(--gold2);font-size:15px}
 .range-row select{width:auto;min-width:150px;flex:0 0 auto;padding:9px 11px;font-size:13px}
 
-/* ---- 错词本：按测试次数归档的区块 ---- */
-.wrun{border-top:1px dashed var(--line);padding-top:2px}
+/* ---- 错词本：按测试次数归档的区块（可折叠） ---- */
+.wrun{border-top:1px dashed var(--line)}
+.wrun:first-of-type{border-top:none}
+.wrun > summary{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  padding:11px 2px;cursor:pointer;list-style:none;font-size:13px;border-radius:8px;
+}
+.wrun > summary::-webkit-details-marker{display:none}
+.wrun > summary::marker{content:''}
+.wrun > summary:hover{background:var(--panel2)}
+.wrun > summary:hover .wt-title{color:var(--gold2)}
+.wt-arrow{display:inline-block;font-size:9px;color:var(--gold);margin-right:7px;transition:.15s}
+.wrun[open] > summary .wt-arrow{transform:rotate(90deg)}
+.wrun > summary .wt-acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.wrun > table.wrong-table{margin:2px 0 12px}
 
 /* ---- 测试页：当前词库状态条 ---- */
 .picked-bar{
@@ -594,7 +607,7 @@ footer code{color:var(--gold2)}
   <section id="tab-result" class="tab">
     <div id="lastResult"></div>
     <div class="card">
-      <h2>错词本（按测试次数归档）</h2>
+      <h2>错词本（按测试次数归档 · 点击每条展开）</h2>
       <div id="wrongBook"></div>
     </div>
   </section>
@@ -5987,6 +6000,7 @@ function renderWrongBook(){
   let html = `<div class="form-row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
     <span class="muted" style="font-size:12px">共 <b class="gold-text">${records.length}</b> 次测试 · 有错词 <b class="gold-text">${runs.length}</b> 次 · 累计错词 <b class="bad">${totalWrong}</b> 个</span>
     <span class="form-row">
+      <button class="btn ghost sm" id="wbToggleAll">⤵ 全部展开</button>
       <button class="btn sm" onclick="importWrongToLib()">📥 全部错词导入词库</button>
       <button class="btn ghost sm" onclick="exportWrongCSV()">⬇️ 导出全部错词 CSV</button>
     </span>
@@ -5995,18 +6009,18 @@ function renderWrongBook(){
   runs.forEach(run => {
     const d = new Date(run.rec.date);
     const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-    html += `<div class="wrun">
-      <div class="form-row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin:12px 0 6px">
-        <span style="font-size:13px">
-          <b class="gold-text">第 ${run.idx+1} 次测试</b>
+    // 每次测试一个可折叠区块：summary 一行显示次数/时间/词库/错词数 + 操作按钮，默认收起
+    html += `<details class="wrun">
+      <summary>
+        <span class="wt-title"><i class="wt-arrow">▶</i><b class="gold-text">第 ${run.idx+1} 次测试</b>
           <span class="muted">· 🕐 ${ds} · ${esc(run.rec.libName||'—')} · 错词 <b class="bad">${run.wrong.length}</b>/${(run.rec.items||[]).length}</span>
         </span>
-        <span class="form-row">
-          <button class="btn sm" onclick="importWrongToLib(${run.idx})">📥 导入本次错词到词库</button>
-          <button class="btn ghost sm" onclick="exportWrongCSVOnce(${run.idx})">⬇️ 导出本次错词 CSV</button>
-          <button class="btn danger sm" onclick="delOneRecord(${run.idx})">删除本次记录</button>
+        <span class="wt-acts">
+          <button class="btn sm" onclick="event.stopPropagation();importWrongToLib(${run.idx})">📥 导入本次错词到词库</button>
+          <button class="btn ghost sm" onclick="event.stopPropagation();exportWrongCSVOnce(${run.idx})">⬇️ 导出本次错词 CSV</button>
+          <button class="btn danger sm" onclick="event.stopPropagation();delOneRecord(${run.idx})">删除本次记录</button>
         </span>
-      </div>
+      </summary>
       <table class="wrong-table"><tr><th>单词</th><th>词性释义（完整）</th><th>拼写</th><th>错误详情</th></tr>`;
     run.wrong.forEach(w=>{
       const detail = buildErrorDetail(w);
@@ -6014,11 +6028,28 @@ function renderWrongBook(){
         <td class="muted">${esc((w.answer&&w.answer.spelling)||'—')}</td>
         <td class="bad">${esc(detail||'—')}</td></tr>`;
     });
-    html += '</table></div>';
+    html += '</table></details>';
   });
 
   html += `<div class="form-row" style="justify-content:flex-end"><button class="btn danger sm" id="clearAllBtn">🗑 清空全部错词记录</button></div>`;
   box.innerHTML = html;
+
+  // 折叠状态：全部展开 / 全部收起
+  const runsEls = [...box.querySelectorAll('details.wrun')];
+  const toggleBtn = $('wbToggleAll');
+  const syncToggle = () => {
+    if (!toggleBtn) return;
+    const allOpen = runsEls.length > 0 && runsEls.every(el=>el.open);
+    toggleBtn.textContent = allOpen ? '⤴ 全部收起' : '⤵ 全部展开';
+  };
+  if (toggleBtn) toggleBtn.onclick = () => {
+    const allOpen = runsEls.length > 0 && runsEls.every(el=>el.open);
+    runsEls.forEach(el=>{ el.open = !allOpen; });
+    syncToggle();
+  };
+  runsEls.forEach(el=>el.addEventListener('toggle', syncToggle));
+  syncToggle();
+
   $('clearAllBtn').onclick = () => {
     if (!confirm('确定清空全部测试记录与错词？此操作不可恢复。')) return;
     records = []; localStorage.setItem(LS.recs, JSON.stringify(records));
